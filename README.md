@@ -1,7 +1,5 @@
 # 🍽️ Sistema de Recomendação de Cardápio Saudável com IA
 
-> Trabalho Prático Final - Inteligência Artificial
-
 Este projeto implementa um sistema avançado para geração de cardápios alimentares personalizados utilizando técnicas de Inteligência Artificial. O sistema é capaz de criar planos alimentares que respeitam metas nutricionais (calorias, macronutrientes), preferências pessoais e restrições orçamentárias.
 
 ## 🧠 Tecnologias e Algoritmos
@@ -25,8 +23,8 @@ Siga os passos abaixo para configurar o ambiente e executar o projeto.
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/frosipedro/IA-TrabalhoFinal.git
-cd IA-TrabalhoFinal
+git clone https://github.com/frosipedro/AI-HealthyDietPlanner.git
+cd AI-HealthyDietPlanner
 ```
 
 ### 2. Crie um ambiente virtual (Recomendado)
@@ -67,25 +65,23 @@ Ao executar o programa, você será guiado por um assistente interativo no termi
 ## 📂 Estrutura do Projeto
 
 ```
-IA-TrabalhoFinal/
+AI-HealthyDietPlanner/
 ├── algoritmos/             # Módulos de IA (Genético, A*, Fuzzy, RNA)
 ├── data/                   # Base de dados de alimentos
 ├── utils/                  # Utilitários de formatação e validação
-├── main.py                 # Arquivo principal de execução
-└── README.md               # Documentação do projeto
+├── README.md               # Documentação do projeto
+└── main.py                 # Arquivo principal de execução
 ```
 
 ## 👥 Autores
 
 **Grupo:**
 
-- Cristian
-- Marco
-- Pedro
-- William
+- Cristian dos Santos Siqueira — https://github.com/CristianSSiqueira
+- Marco Antônio Hendges — https://github.com/Marco-Hendges
+- Pedro Rockenbach Frosi — https://github.com/frosipedro
+- William Rafael Fagundes — https://github.com/Williamrafaelfagundes
 
 **Professor:** Marcos Sulzbach Morgenstern
 
----
-
-_Desenvolvido como requisito para a disciplina de Inteligência Artificial._
+_Desenvolvido para a disciplina de Inteligência Artificial._
