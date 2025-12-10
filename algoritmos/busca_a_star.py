@@ -2,22 +2,23 @@ import pandas as pd
 import heapq
 from typing import List, Dict, Tuple, Set, Optional, cast
 from dataclasses import dataclass, field
+from data.regras_culinarias import obter_categoria_culinaria, alimento_permitido_na_refeicao
 
 # ============================================================================
 # 2. ALGORITMO A* - PRÉ-SELEÇÃO INTELIGENTE DE ALIMENTOS
+# VERSÃO MELHORADA - Considera contexto culinário
 # ============================================================================
 
 @dataclass(order=True)
 class No:
     """
     Representa um nó na árvore de busca do A*.
-    Usa dataclass com order=True para comparação automática pelo primeiro campo (f).
     """
-    f: float  # f(n) = g(n) + h(n) - deve ser primeiro para ordenação
-    g: float = field(compare=False)  # custo real acumulado
-    h: float = field(compare=False)  # heurística
-    alimentos: Tuple[int, ...] = field(compare=False)  # tupla para ser hashável
-    proximo_indice: int = field(compare=False)  # próximo alimento a considerar
+    f: float
+    g: float = field(compare=False)
+    h: float = field(compare=False)
+    alimentos: Tuple[int, ...] = field(compare=False)
+    proximo_indice: int = field(compare=False)
 
     def __hash__(self):
         return hash(self.alimentos)
@@ -26,11 +27,7 @@ class No:
 class BuscaAEstrela:
     """
     Implementa A* verdadeiro para pré-selecionar os melhores alimentos por tipo de refeição.
-    
-    O algoritmo busca a melhor combinação de alimentos que:
-    - Maximiza saúde e preferência
-    - Minimiza custo
-    - Respeita restrições de orçamento e calorias
+    VERSÃO MELHORADA - Filtra por categorias culinárias apropriadas.
     """
 
     def __init__(self, df_alimentos: pd.DataFrame, meta_calorias: float,
@@ -39,15 +36,14 @@ class BuscaAEstrela:
         self.meta_calorias = meta_calorias
         self.orcamento = orcamento_maximo
 
-        # Pesos para a função objetivo (podem ser ajustados)
+        # Pesos otimizados (mais peso para saúde e preferência)
         self.pesos = pesos or {
-            'saude': 0.35,
+            'saude': 0.40,
             'preferencia': 0.35,
             'custo': 0.15,
-            'calorias': 0.15
+            'calorias': 0.10
         }
         
-        # Cache para métricas dos alimentos
         self._cache_metricas = {}
 
     def _get_metricas_alimento(self, idx: int) -> Tuple[float, float, float, float]:
@@ -85,28 +81,20 @@ class BuscaAEstrela:
     def calcular_custo_g(self, indices: Tuple[int, ...]) -> float:
         """
         Custo real g(n): mede a "penalidade" da seleção atual.
-        
-        Quanto melhor a seleção (alta saúde, alta preferência, baixo custo),
-        menor será g(n).
         """
         if not indices:
             return 0.0
 
         calorias, custo, saude_media, pref_media = self._calcular_metricas_selecao(indices)
         
-        # Penalidade por exceder orçamento (custo proibitivo)
         if custo > self.orcamento:
             return float('inf')
         
-        # Custo baseado no inverso da qualidade
-        # Normaliza saúde (0-100) e preferência (0-1) para mesma escala
         qualidade_saude = saude_media / 100.0
         qualidade_pref = pref_media
         
-        # Penalidade por custo (normalizado pelo orçamento)
         penalidade_custo = custo / self.orcamento if self.orcamento > 0 else 0
         
-        # g(n) = custo acumulado (menor = melhor)
         g = (
             self.pesos['saude'] * (1 - qualidade_saude) +
             self.pesos['preferencia'] * (1 - qualidade_pref) +
@@ -121,17 +109,12 @@ class BuscaAEstrela:
                            max_alimentos: int) -> float:
         """
         Heurística admissível h(n): estima o custo mínimo para completar a seleção.
-        
-        A heurística é ADMISSÍVEL (nunca superestima) pois assume que podemos
-        adicionar os melhores alimentos restantes.
         """
         alimentos_restantes = max_alimentos - len(indices)
         
         if alimentos_restantes <= 0:
-            # Já temos o máximo de alimentos - avalia qualidade final
             calorias, custo, saude, pref = self._calcular_metricas_selecao(indices)
             
-            # Penalidade por desvio calórico
             if self.meta_calorias > 0:
                 desvio_calorico = abs(calorias - self.meta_calorias) / self.meta_calorias
             else:
@@ -139,31 +122,21 @@ class BuscaAEstrela:
             
             return self.pesos['calorias'] * desvio_calorico
         
-        # Estima melhoria possível com alimentos restantes
-        # Assume otimisticamente que podemos adicionar alimentos perfeitos
-        # (saúde=100, pref=1, custo=0) - isso garante admissibilidade
-        
-        # A heurística retorna 0 como limite inferior otimista
-        # Isso é admissível mas não muito informativo
-        # Podemos melhorar calculando baseado nos melhores alimentos disponíveis
-        
         if proximo_idx >= len(indices_disponiveis):
             return 0.0
         
-        # Calcula a melhor melhoria possível com alimentos restantes
         melhores_disponiveis = []
         for i in range(proximo_idx, min(proximo_idx + alimentos_restantes, len(indices_disponiveis))):
             idx = indices_disponiveis[i]
             _, custo, saude, pref = self._get_metricas_alimento(idx)
-            score = (saude / 100.0 + pref) / 2  # score médio
+            score = (saude / 100.0 + pref) / 2
             melhores_disponiveis.append(score)
         
         if not melhores_disponiveis:
             return 0.0
         
-        # Heurística otimista: assume que conseguiremos o melhor score possível
         melhor_score_possivel = max(melhores_disponiveis) if melhores_disponiveis else 1.0
-        h = (1 - melhor_score_possivel) * 0.1  # fator pequeno para manter admissibilidade
+        h = (1 - melhor_score_possivel) * 0.1
         
         return h
 
@@ -173,40 +146,49 @@ class BuscaAEstrela:
                                            max_iteracoes: int = 10000) -> List[int]:
         """
         Usa A* para encontrar a melhor combinação de alimentos.
-        
-        Args:
-            tipo_refeicao: tipo de refeição a buscar
-            top_n: número máximo de alimentos a retornar
-            max_alimentos_selecao: máximo de alimentos em uma combinação
-            max_iteracoes: limite de iterações para evitar loops infinitos
-        
-        Returns:
-            Lista de índices dos melhores alimentos encontrados
+        VERSÃO MELHORADA - Filtra por categorias culinárias apropriadas.
         """
         print(f"🔍 A* buscando melhores alimentos para: {tipo_refeicao}")
 
-        # Filtra alimentos do tipo específico
         df_tipo = cast(pd.DataFrame, self.df[self.df['tipo'] == tipo_refeicao].copy())
 
         if len(df_tipo) == 0:
             print(f"⚠️  Nenhum alimento encontrado do tipo '{tipo_refeicao}'")
             return []
 
-        # Índices disponíveis (ordenados por score inicial para melhor performance)
-        df_tipo['_score_inicial'] = (
-            (df_tipo['nota_saudavel_fuzzy'] / 100) * self.pesos['saude'] +
-            df_tipo['nota_preferencia_rna'] * self.pesos['preferencia'] -
-            (df_tipo['custo'] / max(df_tipo['custo'].max(), 1)) * self.pesos['custo']
+        # NOVO: Filtra por categorias culinárias apropriadas
+        # Determina qual tipo de refeição este tipo nutricional pode servir
+        # Ex: proteína -> almoço/jantar, carboidrato -> todas, fruta -> lanches
+        refeicoes_alvo = self._determinar_refeicoes_alvo(tipo_refeicao)
+        
+        # Filtra alimentos que são apropriados para PELO MENOS UMA refeição alvo
+        df_tipo_filtrado = df_tipo[
+            df_tipo.apply(
+                lambda row: any(
+                    alimento_permitido_na_refeicao(row['nome'], ref) 
+                    for ref in refeicoes_alvo
+                ),
+                axis=1
+            )
+        ].copy()  # .copy() evita o warning
+        
+        if len(df_tipo_filtrado) == 0:
+            print(f"⚠️  Nenhum alimento apropriado encontrado para {tipo_refeicao}")
+            return []
+        
+        # Score inicial com pesos otimizados
+        df_tipo_filtrado['_score_inicial'] = (
+            (df_tipo_filtrado['nota_saudavel_fuzzy'] / 100) * self.pesos['saude'] +
+            df_tipo_filtrado['nota_preferencia_rna'] * self.pesos['preferencia'] -
+            (df_tipo_filtrado['custo'] / max(df_tipo_filtrado['custo'].max(), 1)) * self.pesos['custo']
         )
-        df_tipo_sorted = df_tipo.sort_values(by='_score_inicial', ascending=False)
+        df_tipo_sorted = df_tipo_filtrado.sort_values(by='_score_inicial', ascending=False)
         indices_disponiveis = df_tipo_sorted.index.tolist()
         
-        # Limita candidatos para melhor performance
         max_candidatos = min(len(indices_disponiveis), top_n * 3)
         indices_disponiveis = indices_disponiveis[:max_candidatos]
 
         # Inicialização do A*
-        # Estado inicial: nenhum alimento selecionado
         estado_inicial = tuple()
         g_inicial = 0.0
         h_inicial = self.calcular_heuristica(estado_inicial, indices_disponiveis, 0, max_alimentos_selecao)
@@ -219,18 +201,14 @@ class BuscaAEstrela:
             proximo_indice=0
         )
 
-        # Fila de prioridade (min-heap)
         fronteira: List[No] = []
         heapq.heappush(fronteira, no_inicial)
         
-        # Conjunto de estados visitados
         visitados: Set[Tuple[int, ...]] = set()
         
-        # Melhor solução encontrada
         melhor_solucao: Optional[Tuple[int, ...]] = None
         melhor_custo = float('inf')
         
-        # Coleta todas as boas soluções para retornar top_n
         todas_solucoes: List[Tuple[float, Tuple[int, ...]]] = []
         
         iteracoes = 0
@@ -239,21 +217,17 @@ class BuscaAEstrela:
         while fronteira and iteracoes < max_iteracoes:
             iteracoes += 1
             
-            # Remove nó com menor f(n)
             no_atual = heapq.heappop(fronteira)
             
-            # Pula se já visitado
             if no_atual.alimentos in visitados:
                 continue
             
             visitados.add(no_atual.alimentos)
             nos_expandidos += 1
             
-            # Verifica se é uma solução válida
             if len(no_atual.alimentos) > 0:
                 calorias, custo, _, _ = self._calcular_metricas_selecao(no_atual.alimentos)
                 
-                # Solução válida se não excede orçamento
                 if custo <= self.orcamento:
                     todas_solucoes.append((no_atual.g, no_atual.alimentos))
                     
@@ -261,32 +235,25 @@ class BuscaAEstrela:
                         melhor_custo = no_atual.g
                         melhor_solucao = no_atual.alimentos
             
-            # Se já temos alimentos suficientes ou não há mais candidatos, não expande
             if len(no_atual.alimentos) >= max_alimentos_selecao:
                 continue
             
             if no_atual.proximo_indice >= len(indices_disponiveis):
                 continue
             
-            # Expande: gera sucessores adicionando cada alimento disponível
             for i in range(no_atual.proximo_indice, len(indices_disponiveis)):
                 novo_alimento = indices_disponiveis[i]
                 
-                # Cria novo estado
                 novos_alimentos = no_atual.alimentos + (novo_alimento,)
                 
-                # Pula se já visitado
                 if novos_alimentos in visitados:
                     continue
                 
-                # Calcula custo g do novo estado
                 novo_g = self.calcular_custo_g(novos_alimentos)
                 
-                # Poda: ignora estados inválidos
                 if novo_g == float('inf'):
                     continue
                 
-                # Calcula heurística
                 novo_h = self.calcular_heuristica(
                     novos_alimentos, 
                     indices_disponiveis, 
@@ -294,7 +261,6 @@ class BuscaAEstrela:
                     max_alimentos_selecao
                 )
                 
-                # Cria novo nó
                 novo_no = No(
                     f=novo_g + novo_h,
                     g=novo_g,
@@ -305,10 +271,8 @@ class BuscaAEstrela:
                 
                 heapq.heappush(fronteira, novo_no)
 
-        # Ordena soluções por custo e extrai os melhores alimentos únicos
         todas_solucoes.sort(key=lambda x: x[0])
         
-        # Coleta alimentos únicos das melhores soluções
         alimentos_selecionados = []
         alimentos_vistos = set()
         
@@ -322,7 +286,6 @@ class BuscaAEstrela:
             if len(alimentos_selecionados) >= top_n:
                 break
         
-        # Se não encontrou suficientes, completa com os melhores por score
         if len(alimentos_selecionados) < top_n:
             for idx in indices_disponiveis:
                 if idx not in alimentos_vistos:
@@ -335,10 +298,26 @@ class BuscaAEstrela:
         print(f"✅ {len(alimentos_selecionados)} alimentos pré-selecionados!\n")
 
         return alimentos_selecionados
+    
+    def _determinar_refeicoes_alvo(self, tipo_nutricional: str) -> List[str]:
+        """
+        NOVO: Determina quais refeições são apropriadas para cada tipo nutricional.
+        """
+        mapeamento = {
+            'proteina': ['Café da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar'],
+            'carboidrato': ['Café da Manhã', 'Almoço', 'Lanche da Manhã', 'Lanche da Tarde', 'Jantar'],
+            'vegetal': ['Almoço', 'Jantar'],
+            'fruta': ['Café da Manhã', 'Lanche da Manhã', 'Lanche da Tarde', 'Ceia'],
+            'gordura': ['Café da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar'],
+            'industrializado': ['Lanche da Manhã', 'Lanche da Tarde'],
+        }
+        
+        return mapeamento.get(tipo_nutricional, ['Almoço', 'Jantar', 'Café da Manhã'])
 
-    def preselecionar_alimentos_todas_refeicoes(self, top_n_por_tipo: int = 15) -> Dict[str, List[int]]:
+    def preselecionar_alimentos_todas_refeicoes(self, top_n_por_tipo: int = 20) -> Dict[str, List[int]]:
         """
         Executa A* para cada tipo de refeição e retorna dicionário com os melhores.
+        VERSÃO MELHORADA - top_n aumentado de 15 para 20.
         """
         tipos_refeicao = self.df['tipo'].unique()
 
@@ -346,7 +325,6 @@ class BuscaAEstrela:
         print("🎯 EXECUTANDO ALGORITMO A* - PRÉ-SELEÇÃO INTELIGENTE")
         print("-" * 60 + "\n")
 
-        # Limpa cache entre execuções
         self._cache_metricas.clear()
 
         melhores_por_tipo = {}

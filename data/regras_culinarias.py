@@ -1,10 +1,6 @@
 """
 Regras Culinárias - Contexto do Mundo Real para Composição de Refeições
-
-Este módulo define:
-1. Categorias culinárias dos alimentos
-2. Regras de combinação por tipo de refeição
-3. Restrições de gramatura realistas
+VERSÃO MELHORADA - Validações mais rígidas e categorias refinadas
 """
 
 import unicodedata
@@ -13,14 +9,11 @@ import unicodedata
 def normalizar_texto(texto: str) -> str:
     """
     Normaliza texto removendo acentos e convertendo para minúsculas.
-    Ex: "Café da Manhã" -> "cafe da manha"
     """
-    # Remove acentos
     texto_sem_acento = ''.join(
         c for c in unicodedata.normalize('NFD', texto)
         if unicodedata.category(c) != 'Mn'
     )
-    # Converte para minúsculas e remove espaços extras
     return texto_sem_acento.lower().strip()
 
 # ============================================================================
@@ -43,11 +36,13 @@ CATEGORIAS_CULINARIAS = {
     'Linguiça de Frango': 'prato_principal',
     'Lombo Suíno': 'prato_principal',
     'Pernil Suíno': 'prato_principal',
-    'Bacon': 'frios',  # Geralmente acompanha, não é prato principal
+    'Bacon': 'frios',
     'Salmão': 'prato_principal',
     'Tilápia': 'prato_principal',
     'Sardinha': 'prato_principal',
     'Atum': 'prato_principal',
+    'Camarão': 'prato_principal',
+    'Bacalhau': 'prato_principal',
     
     # OVOS E LATICÍNIOS
     'Ovo': 'proteina_cafe',
@@ -62,38 +57,39 @@ CATEGORIAS_CULINARIAS = {
     'Iogurte Grego': 'iogurte',
     'Manteiga': 'tempero',
     
-    # CARBOIDRATOS BASE (acompanhamentos)
+    # CARBOIDRATOS BASE
     'Arroz Branco': 'acompanhamento_base',
     'Arroz Integral': 'acompanhamento_base',
     'Macarrão': 'acompanhamento_base',
-    'Macarrão Instantâneo': 'refeicao_rapida',  # Prato único, não acompanhamento
+    'Macarrão Instantâneo': 'refeicao_rapida',
     'Aveia': 'cafe_da_manha_liquido',  # PRECISA de leite/iogurte!
-    'Mingau de Aveia': 'mingau', # Já preparado
-    'Farinha de Mandioca': 'ingrediente',  # Não se come puro - precisa virar farofa!
-    'Farinha de Trigo': 'ingrediente',  # Não se come puro
+    'Mingau de Aveia': 'mingau',
+    'Farinha de Mandioca': 'ingrediente',  # NUNCA ISOLADO
+    'Farinha de Trigo': 'ingrediente',  # NUNCA ISOLADO
     'Cuscuz de Milho': 'cafe_da_manha',
     'Pão Francês': 'cafe_da_manha',
     'Pão Integral': 'cafe_da_manha',
     'Tapioca': 'cafe_da_manha',
     'Pão de Forma': 'cafe_da_manha',
     'Pão de Centeio': 'cafe_da_manha',
+    'Granola': 'cafe_da_manha_liquido',  # PRECISA de leite/iogurte!
     
     # LEGUMINOSAS
     'Feijão Preto': 'leguminosa',
     'Feijão Carioca': 'leguminosa',
-    'Lentilha': 'leguminosa',  # Não se come 140g puro!
+    'Lentilha': 'leguminosa',
     'Grão-de-bico': 'leguminosa',
     'Ervilha': 'leguminosa',
     'Soja': 'leguminosa',
     
-    # TUBÉRCULOS (podem ser acompanhamento ou prato)
+    # TUBÉRCULOS
     'Batata Inglesa': 'tuberculo',
     'Batata Doce': 'tuberculo',
     'Mandioca': 'tuberculo',
     'Inhame': 'tuberculo',
     'Cará': 'tuberculo',
     
-    # VEGETAIS (sempre guarnição/salada)
+    # VEGETAIS
     'Brócolis': 'guarnição',
     'Couve Flor': 'guarnição',
     'Cenoura': 'guarnição',
@@ -106,7 +102,7 @@ CATEGORIAS_CULINARIAS = {
     'Vagem': 'guarnição',
     'Milho Verde': 'guarnição',
     
-    # FRUTAS (lanches ou sobremesas)
+    # FRUTAS
     'Banana Prata': 'fruta',
     'Banana Nanica': 'fruta',
     'Maçã': 'fruta',
@@ -120,34 +116,29 @@ CATEGORIAS_CULINARIAS = {
     'Abacaxi': 'fruta',
     'Uva': 'fruta',
     
-    # OLEAGINOSAS (sempre pequenas quantidades)
+    # OLEAGINOSAS
     'Amendoim': 'oleaginosa',
     'Castanha de Caju': 'oleaginosa',
     'Castanha do Pará': 'oleaginosa',
     'Nozes': 'oleaginosa',
     'Amêndoas': 'oleaginosa',
     
-    # GORDURAS (tempero, não prato)
+    # GORDURAS
     'Óleo de Soja': 'tempero',
     'Óleo de Canola': 'tempero',
     'Azeite de Oliva': 'tempero',
     'Margarina': 'tempero',
     
-    # INDUSTRIALIZADOS E PREPARAÇÕES
-    'Arroz Carreteiro': 'refeicao_pronta',
-    'Feijoada': 'refeicao_pronta',
+    # INDUSTRIALIZADOS
     'Pão de Queijo': 'lanche_leve',
     'Coxinha': 'lanche_leve',
     'Pastel de Carne': 'lanche_leve',
     'Mortadela': 'frios',
     'Presunto': 'frios',
     'Peito de Peru': 'frios',
-    'Arroz + Feijão': 'refeicao_pronta',
-    'Omelete': 'proteina_cafe',
-    'Purê de Batata': 'tuberculo',
-    'Salada Mista': 'salada',
-    'Strogonoff de Frango': 'refeicao_pronta',
-    'Frango à Milanesa': 'refeicao_pronta',
+    'Salsicha': 'frios',
+    'Nuggets de Frango': 'lanche_leve',
+    'Batata Frita Congelada': 'lanche_leve',
 }
 
 
@@ -158,26 +149,27 @@ CATEGORIAS_CULINARIAS = {
 REGRAS_COMPOSICAO = {
     'Café da Manhã': {
         'permitidos': [
-            'cafe_da_manha',           # Pães, tapioca, cuscuz, mingau
-            'cafe_da_manha_liquido',   # Aveia (PRECISA de líquido)
-            'mingau',                  # Mingau pronto
-            'fruta',                   # Frutas
-            'oleaginosa',              # Castanhas
-            'iogurte',                 # Iogurtes
-            'frios',                   # Queijos, presunto
-            'bebida',                  # Leite
-            'tempero',                 # Manteiga
-            'proteina_cafe',           # Ovos
+            'cafe_da_manha',
+            'cafe_da_manha_liquido',
+            'mingau',
+            'fruta',
+            'oleaginosa',
+            'iogurte',
+            'frios',
+            'bebida',
+            'tempero',
+            'proteina_cafe',
         ],
         'proibidos': [
-            'acompanhamento_base',     # Sem arroz/feijão/lentilha
-            'leguminosa',              # Sem feijão
-            'tuberculo',               # Sem batata
-            'prato_principal',         # Sem bife/frango
-            'refeicao_pronta',         # Sem feijoada/strogonoff
-            'ingrediente',             # Sem farinha pura!
+            'acompanhamento_base',
+            'leguminosa',
+            'tuberculo',
+            'prato_principal',
+            'refeicao_pronta',
+            'ingrediente',  # CRÍTICO: Farinha nunca sozinha
             'guarnição',
             'salada',
+            'refeicao_rapida',
         ],
         'estrutura': {
             'obrigatorio_um_de': ['cafe_da_manha', 'fruta', 'cafe_da_manha_liquido', 'proteina_cafe', 'iogurte', 'mingau'],
@@ -186,10 +178,10 @@ REGRAS_COMPOSICAO = {
             'max_itens': 4,
         },
         'combinacoes_obrigatorias': {
-            # Se tem aveia, DEVE ter leite ou iogurte
+            # Se tem aveia/granola, DEVE ter leite ou iogurte
             'cafe_da_manha_liquido': ['bebida', 'iogurte'],
-            # Se tem pão, DEVE ter algo para passar/rechear (frios, tempero, ovo)
-            'cafe_da_manha': ['frios', 'tempero', 'proteina_cafe', 'bebida'],
+            # Se tem pão, DEVE ter algo para passar/rechear
+            'cafe_da_manha': ['frios', 'tempero', 'proteina_cafe'],
         }
     },
     
@@ -211,6 +203,8 @@ REGRAS_COMPOSICAO = {
             'tuberculo',
             'refeicao_pronta',
             'proteina_cafe',
+            'ingrediente',
+            'cafe_da_manha_liquido',  # Aveia precisa de preparo completo
         ],
         'estrutura': {
             'obrigatorio_um_de': ['fruta', 'iogurte', 'oleaginosa', 'lanche_leve', 'cafe_da_manha', 'mingau'],
@@ -223,33 +217,33 @@ REGRAS_COMPOSICAO = {
     'Almoço': {
         'permitidos': [
             'prato_principal',
-            'acompanhamento_base', # Arroz, Macarrão
-            'leguminosa',          # Feijão
-            'tuberculo',           # Batata
-            'frios',               # Queijo (para macarrão)
+            'acompanhamento_base',
+            'leguminosa',
+            'tuberculo',
+            'frios',
             'guarnição',
             'salada',
             'refeicao_pronta',
             'tempero',
         ],
         'proibidos': [
-            'cafe_da_manha',      # Sem pão/aveia no almoço
+            'cafe_da_manha',
             'cafe_da_manha_liquido',
-            'fruta',              # Fruta geralmente é sobremesa, mas vamos focar no prato principal
+            'fruta',
             'oleaginosa',
             'iogurte',
             'proteina_cafe',
             'ingrediente',
+            'mingau',
+            'lanche_leve',
         ],
         'estrutura': {
-            # Opção 1: Refeição completa tradicional
             'refeicao_completa': {
                 'obrigatorio': ['prato_principal'],
                 'opcional': ['acompanhamento_base', 'leguminosa', 'tuberculo', 'guarnição', 'salada', 'frios'],
                 'min_itens': 2,
                 'max_itens': 5,
             },
-            # Opção 2: Prato único pronto
             'refeicao_pronta': {
                 'obrigatorio': ['refeicao_pronta'],
                 'opcional': ['guarnição', 'salada'],
@@ -269,7 +263,7 @@ REGRAS_COMPOSICAO = {
             'mingau',
             'frios',
             'bebida',
-            'proteina_cafe', # Ovos a tarde pode
+            'proteina_cafe',
         ],
         'proibidos': [
             'prato_principal',
@@ -277,17 +271,21 @@ REGRAS_COMPOSICAO = {
             'leguminosa',
             'tuberculo',
             'refeicao_pronta',
+            'ingrediente',
+            'cafe_da_manha_liquido',
         ],
         'estrutura': {
             'obrigatorio_um_de': ['fruta', 'iogurte', 'oleaginosa', 'lanche_leve', 'cafe_da_manha', 'proteina_cafe', 'mingau'],
             'opcional': ['frios', 'bebida'],
             'min_itens': 1,
             'max_itens': 3,
+        },
+        'combinacoes_obrigatorias': {
+            'cafe_da_manha': ['frios', 'tempero', 'proteina_cafe'],
         }
     },
     
     'Jantar': {
-        # Mesmas regras do almoço
         'permitidos': [
             'prato_principal',
             'acompanhamento_base',
@@ -298,7 +296,7 @@ REGRAS_COMPOSICAO = {
             'salada',
             'refeicao_pronta',
             'tempero',
-            'proteina_cafe', # Omelete no jantar é comum
+            'proteina_cafe',
         ],
         'proibidos': [
             'cafe_da_manha',
@@ -308,6 +306,7 @@ REGRAS_COMPOSICAO = {
             'iogurte',
             'ingrediente',
             'mingau',
+            'lanche_leve',
         ],
         'estrutura': {
             'refeicao_completa': {
@@ -341,8 +340,10 @@ REGRAS_COMPOSICAO = {
             'tuberculo',
             'refeicao_pronta',
             'cafe_da_manha',
+            'cafe_da_manha_liquido',
             'frios',
             'proteina_cafe',
+            'ingrediente',
         ],
         'estrutura': {
             'obrigatorio_um_de': ['fruta', 'iogurte', 'bebida', 'lanche_leve', 'mingau'],
@@ -353,13 +354,12 @@ REGRAS_COMPOSICAO = {
     },
 }
 
-# Regra padrão para refeições não mapeadas
 REGRA_PADRAO = {
-    'permitidos': ['lanche_leve', 'prato_principal', 'acompanhamento_base'],
+    'permitidos': ['lanche_leve', 'prato_principal', 'acompanhamento_base', 'fruta', 'iogurte'],
     'proibidos': ['tempero', 'ingrediente'],
     'estrutura': {
-        'obrigatorio': [],
-        'opcional': ['lanche_leve', 'prato_principal'],
+        'obrigatorio_um_de': ['lanche_leve', 'prato_principal', 'fruta'],
+        'opcional': ['acompanhamento_base'],
         'min_itens': 1,
         'max_itens': 3,
     }
@@ -400,12 +400,6 @@ GRAMATURA_REALISTA = {
         'max': 150,
         'ideal': 100,
         'descricao': 'Batatas, mandioca'
-    },
-    'acompanhamento': {
-        'min': 50,
-        'max': 150,
-        'ideal': 80,
-        'descricao': 'Farofa, complementos'
     },
     'frios': {
         'min': 30,
@@ -459,7 +453,7 @@ GRAMATURA_REALISTA = {
         'min': 30,
         'max': 80,
         'ideal': 50,
-        'descricao': 'Aveia (precisa de leite/iogurte)'
+        'descricao': 'Aveia, granola (precisa de leite/iogurte)'
     },
     'mingau': {
         'min': 150,
@@ -495,7 +489,7 @@ GRAMATURA_REALISTA = {
         'min': 0,
         'max': 0,
         'ideal': 0,
-        'descricao': 'Não deve ser usado isoladamente'
+        'descricao': 'NUNCA deve ser usado isoladamente'
     },
 }
 
@@ -512,16 +506,12 @@ def obter_categoria_culinaria(nome_alimento: str) -> str:
 def obter_regras_refeicao(nome_refeicao: str) -> dict:
     """
     Retorna as regras de composição para uma refeição.
-    Busca por nome exato ou por palavras-chave (normalizado, sem acentos).
     """
-    # Busca exata (case-sensitive, com acentos)
     if nome_refeicao in REGRAS_COMPOSICAO:
         return REGRAS_COMPOSICAO[nome_refeicao]
     
-    # Normaliza o nome para busca case-insensitive e sem acentos
     nome_norm = normalizar_texto(nome_refeicao)
     
-    # Busca por palavras-chave (agora normalizado)
     if 'cafe' in nome_norm or 'breakfast' in nome_norm:
         return REGRAS_COMPOSICAO['Café da Manhã']
     elif 'almoco' in nome_norm or 'lunch' in nome_norm:
@@ -536,7 +526,6 @@ def obter_regras_refeicao(nome_refeicao: str) -> dict:
     elif 'ceia' in nome_norm or 'supper' in nome_norm:
         return REGRAS_COMPOSICAO['Ceia']
     
-    # Padrão
     return REGRA_PADRAO
 
 
@@ -547,8 +536,16 @@ def obter_limites_gramatura(nome_alimento: str) -> dict:
 
 
 def alimento_permitido_na_refeicao(nome_alimento: str, nome_refeicao: str) -> bool:
-    """Verifica se um alimento é permitido em determinada refeição."""
+    """
+    Verifica se um alimento é permitido em determinada refeição.
+    VERSÃO MELHORADA - Bloqueia ingredientes SEMPRE.
+    """
     categoria = obter_categoria_culinaria(nome_alimento)
+    
+    # REGRA CRÍTICA: Ingredientes NUNCA são permitidos isoladamente
+    if categoria == 'ingrediente':
+        return False
+    
     regras = obter_regras_refeicao(nome_refeicao)
     
     # Verifica proibições
@@ -559,8 +556,6 @@ def alimento_permitido_na_refeicao(nome_alimento: str, nome_refeicao: str) -> bo
     if categoria in regras.get('permitidos', []):
         return True
     
-    # Se não está nem permitido nem proibido, depende da regra
-    # Por padrão, bloqueia se houver lista de permitidos
     if regras.get('permitidos'):
         return False
     
@@ -570,32 +565,23 @@ def alimento_permitido_na_refeicao(nome_alimento: str, nome_refeicao: str) -> bo
 def validar_composicao_refeicao(alimentos: list, nome_refeicao: str) -> dict:
     """
     Valida se uma composição de refeição faz sentido culinariamente.
-    
-    Args:
-        alimentos: Lista de dicts com {'nome': str, 'gramas': float}
-        nome_refeicao: Nome da refeição
-    
-    Returns:
-        {
-            'valida': bool,
-            'problemas': [str],  # Lista de problemas encontrados
-            'score': float  # 0-1, quanto mais próximo de 1, melhor
-        }
+    VERSÃO MELHORADA - Penalizações mais pesadas.
     """
     regras = obter_regras_refeicao(nome_refeicao)
     problemas = []
     score = 1.0
     
-    # Obtém categorias dos alimentos
     categorias_presentes = [obter_categoria_culinaria(a['nome']) for a in alimentos]
     nomes_presentes = [a['nome'] for a in alimentos]
     
-    # Verifica estrutura
+    # PENALIDADE CRÍTICA: Se tem ingrediente puro
+    if 'ingrediente' in categorias_presentes:
+        problemas.append("CRÍTICO: Farinha/Ingrediente não pode ser servido puro!")
+        score -= 0.9  # Quase zera o score
+    
     estrutura = regras.get('estrutura', {})
     
-    # Se tem múltiplas estruturas possíveis (ex: almoço)
     if 'refeicao_completa' in estrutura:
-        # Tenta validar contra cada estrutura possível
         estruturas_possiveis = [
             estrutura['refeicao_completa'],
             estrutura.get('refeicao_pronta', {})
@@ -608,117 +594,104 @@ def validar_composicao_refeicao(alimentos: list, nome_refeicao: str) -> dict:
             temp_problemas = []
             temp_score = 1.0
             
-            # Verifica obrigatórios
             for obrig in est.get('obrigatorio', []):
                 if obrig not in categorias_presentes:
-                    temp_problemas.append(f"Falta {obrig} na {nome_refeicao}")
-                    temp_score -= 0.3
-
-            # Verifica obrigatorio_um_de (PELO MENOS UM deve estar presente)
+                    temp_problemas.append(f"Falta {obrig}")
+                    temp_score -= 0.4  # Penalidade aumentada
+            
             obrigatorio_um_de = est.get('obrigatorio_um_de', [])
             if obrigatorio_um_de:
                 tem_pelo_menos_um = any(cat in categorias_presentes for cat in obrigatorio_um_de)
                 if not tem_pelo_menos_um:
-                    temp_problemas.append(f"Precisa ter pelo menos um de: {', '.join(obrigatorio_um_de)}")
-                    temp_score -= 0.5
+                    temp_problemas.append(f"Precisa ter: {', '.join(obrigatorio_um_de)}")
+                    temp_score -= 0.6  # Penalidade aumentada
             
-            # Verifica quantidade de itens
             num_itens = len(alimentos)
             if num_itens < est.get('min_itens', 1):
-                temp_problemas.append(f"Poucos itens ({num_itens}), mínimo {est['min_itens']}")
-                temp_score -= 0.2
+                temp_problemas.append(f"Poucos itens ({num_itens})")
+                temp_score -= 0.3
             elif num_itens > est.get('max_itens', 10):
-                temp_problemas.append(f"Muitos itens ({num_itens}), máximo {est['max_itens']}")
-                temp_score -= 0.1
+                temp_problemas.append(f"Muitos itens ({num_itens})")
+                temp_score -= 0.2
             
             if temp_score > melhor_score:
                 melhor_score = temp_score
                 melhores_problemas = temp_problemas
         
-        score = melhor_score
+        score = min(score, melhor_score)
         problemas = melhores_problemas
     else:
-        # Estrutura simples
-        # Verifica obrigatórios (TODOS devem estar presentes)
         for obrig in estrutura.get('obrigatorio', []):
             if obrig not in categorias_presentes:
-                problemas.append(f"Falta {obrig} na {nome_refeicao}")
-                score -= 0.3
+                problemas.append(f"Falta {obrig}")
+                score -= 0.4
         
-        # Verifica obrigatorio_um_de (PELO MENOS UM deve estar presente)
         obrigatorio_um_de = estrutura.get('obrigatorio_um_de', [])
         if obrigatorio_um_de:
             tem_pelo_menos_um = any(cat in categorias_presentes for cat in obrigatorio_um_de)
             if not tem_pelo_menos_um:
-                problemas.append(f"Precisa ter pelo menos um de: {', '.join(obrigatorio_um_de)}")
-                score -= 0.5
+                problemas.append(f"Precisa ter: {', '.join(obrigatorio_um_de)}")
+                score -= 0.6
         
         num_itens = len(alimentos)
         if num_itens < estrutura.get('min_itens', 1):
             problemas.append(f"Poucos itens ({num_itens})")
-            score -= 0.2
+            score -= 0.3
         elif num_itens > estrutura.get('max_itens', 10):
             problemas.append(f"Muitos itens ({num_itens})")
-            score -= 0.1
+            score -= 0.2
     
     # Verifica alimentos proibidos
     for alimento in alimentos:
         if not alimento_permitido_na_refeicao(alimento['nome'], nome_refeicao):
             categoria = obter_categoria_culinaria(alimento['nome'])
-            problemas.append(f"{alimento['nome']} ({categoria}) não é apropriado para {nome_refeicao}")
-            score -= 0.4
+            problemas.append(f"{alimento['nome']} ({categoria}) inadequado")
+            score -= 0.5  # Penalidade aumentada
     
-    # NOVO: Verifica combinações obrigatórias (ex: aveia precisa de leite)
+    # COMBINAÇÕES OBRIGATÓRIAS (penalidade MUITO PESADA)
     combinacoes_obrigatorias = regras.get('combinacoes_obrigatorias', {})
     for categoria_que_exige, categorias_necessarias in combinacoes_obrigatorias.items():
-        # Se tem a categoria que exige, verifica se tem pelo menos uma das necessárias
         if categoria_que_exige in categorias_presentes:
             tem_necessaria = any(cat in categorias_presentes for cat in categorias_necessarias)
             if not tem_necessaria:
-                # Identifica qual alimento está sem a combinação
                 alimento_problema = next((a['nome'] for a in alimentos 
                                         if obter_categoria_culinaria(a['nome']) == categoria_que_exige), None)
-                problemas.append(f"{alimento_problema} precisa de {' ou '.join(categorias_necessarias)}")
-                score -= 0.7  # Penalidade MUITO PESADA - combinação inválida!
+                problemas.append(f"CRÍTICO: {alimento_problema} precisa de {' ou '.join(categorias_necessarias)}")
+                score -= 0.8  # Penalidade aumentada
     
-    # NOVO: Lógica Arroz + Feijão
-    # Se tem Arroz (acompanhamento_base), recomenda fortemente Feijão (leguminosa)
-    # Mas se for Macarrão (também acompanhamento_base), não precisa.
+    # Lógica Arroz + Feijão
     tem_arroz = any('Arroz' in nome for nome in nomes_presentes)
     tem_leguminosa = 'leguminosa' in categorias_presentes
     
     if tem_arroz and not tem_leguminosa:
-        problemas.append("Arroz sem feijão/leguminosa")
-        score -= 0.3
+        problemas.append("Arroz sem feijão")
+        score -= 0.4  # Penalidade aumentada
     
-    # Verifica duplicação de categorias de carboidratos (REGRA CRÍTICA)
-    # Não pode ter 'acompanhamento_base' + 'tuberculo' (Arroz + Batata)
-    # Não pode ter múltiplos 'acompanhamento_base' (Arroz + Macarrão)
+    # Duplicação de carboidratos (CRÍTICO)
     count_base = categorias_presentes.count('acompanhamento_base')
     count_tuberculo = categorias_presentes.count('tuberculo')
     
     if count_base > 1:
-        problemas.append(f"Múltiplos carboidratos base ({count_base})")
-        score -= 0.6
+        problemas.append(f"CRÍTICO: Múltiplos carboidratos base ({count_base})")
+        score -= 0.7  # Penalidade aumentada
         
     if count_base > 0 and count_tuberculo > 0:
-        # Exceção: Se for uma refeição pronta que já inclui tudo, ok? Mas aqui estamos validando componentes.
-        problemas.append("Mistura de carboidratos (Base + Tubérculo)")
-        score -= 0.5
+        problemas.append("CRÍTICO: Carboidrato base + Tubérculo")
+        score -= 0.6  # Penalidade aumentada
     
-    # Verifica gramaturas absurdas
+    # Gramaturas absurdas
     for alimento in alimentos:
         limites = obter_limites_gramatura(alimento['nome'])
         gramas = alimento['gramas']
         
         if gramas < limites['min'] or gramas > limites['max']:
             problemas.append(
-                f"{alimento['nome']}: {gramas:.0f}g (ideal: {limites['min']}-{limites['max']}g)"
+                f"{alimento['nome']}: {gramas:.0f}g fora do limite ({limites['min']}-{limites['max']}g)"
             )
-            score -= 0.2
+            score -= 0.25
     
     return {
-        'valida': score >= 0.5,  # Considera válida se score >= 0.5
+        'valida': score >= 0.4,  # Threshold mais rigoroso
         'problemas': problemas,
         'score': max(0, score)
     }

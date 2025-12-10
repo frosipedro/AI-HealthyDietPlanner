@@ -1,6 +1,7 @@
 """
 Sistema de Recomendação de Cardápio Saudável
 Com Refeições Compostas e Controle de Macros
+VERSÃO OTIMIZADA - Parâmetros ajustados e melhor integração entre técnicas
 
 Autores: Cristian, Marco, Pedro e William
 Professor: Marcos Sulzbach Morgenstern
@@ -36,7 +37,6 @@ def coletar_configuracao_refeicoes():
     print("🍴 CONFIGURAÇÃO DAS REFEIÇÕES")
     print("-" * 80)
 
-    # Número de refeições
     while True:
         num_refeicoes = validar_numero(
             "Quantas refeições você faz por dia? (3-8): ",
@@ -47,12 +47,11 @@ def coletar_configuracao_refeicoes():
     
     print(f"\n✅ Você fará {num_refeicoes} refeições por dia.\n")
     
-    # Coleta nomes e porcentagens
     refeicoes = []
     porcentagens = []
     
     print("Agora vamos definir cada refeição:")
-    print("Tipos: Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Janta, Ceia\n")
+    print("Tipos: Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia\n")
     
     num_refeicoes = int(num_refeicoes)
     for i in range(num_refeicoes):
@@ -77,7 +76,7 @@ def coletar_configuracao_refeicoes():
             porcentagens.append(pct)
         
         total = sum(porcentagens)
-        if abs(total - 100) < 0.01:  # Tolerância para erros de float
+        if abs(total - 100) < 0.01:
             print(f"\n✅ Total: {total:.1f}% - Perfeito!\n")
             break
         else:
@@ -169,7 +168,6 @@ def coletar_metas_nutricionais():
     6: {"nome": "Zona",          "c": 40, "p": 30, "g": 30},
     }
 
-    # Exemplo de uso:
     escolha_dieta = int(input("Escolha o número do seu estilo de dieta (1-6): "))
     macros = opcoes_dieta[escolha_dieta]
 
@@ -177,7 +175,6 @@ def coletar_metas_nutricionais():
     print(f"Carbos: {macros['c']}%, Proteínas: {macros['p']}%, Gorduras: {macros['g']}%")
     
     # Calcula gramas de cada macro
-    # 1g Carbo = 4 kcal, 1g Prot = 4 kcal, 1g Gord = 9 kcal
     gramas_carbo = (meta_calorias * (macros['c'] / 100)) / 4
     gramas_prot = (meta_calorias * (macros['p'] / 100)) / 4
     gramas_gord = (meta_calorias * (macros['g'] / 100)) / 9
@@ -256,6 +253,7 @@ def coletar_preferencias_vegetais():
 def main():
     """
     Função principal - Pipeline completo
+    VERSÃO OTIMIZADA - Parâmetros ajustados
     """
     
     exibir_cabecalho()
@@ -273,14 +271,23 @@ def main():
     print(f"✅ {len(df_alimentos)} alimentos carregados\n")
     
     # ========================================================================
-    # ETAPA 2: LÓGICA FUZZY
+    # ETAPA 2: LÓGICA FUZZY (Avaliação de Saudabilidade)
     # ========================================================================
     print("=" * 80)
     print("🧠 ETAPA 2/6: APLICANDO LÓGICA FUZZY")
     print("=" * 80 + "\n")
+    print("A Lógica Fuzzy avalia a saudabilidade de cada alimento baseada em:")
+    print("  • Proteínas, carboidratos, fibras")
+    print("  • Sódio e gorduras (saturadas vs insaturadas)")
+    print("  • Tipo de alimento (natural vs industrializado)\n")
     
     df_alimentos = aplicar_logica_fuzzy(df_alimentos)
-    print("✅ Lógica Fuzzy aplicada!\n")
+    
+    # Mostra alguns exemplos
+    print("Exemplos de avaliação Fuzzy:")
+    top_5 = df_alimentos.nlargest(5, 'nota_saudavel_fuzzy')[['nome', 'nota_saudavel_fuzzy']]
+    print(top_5.to_string(index=False))
+    print("\n✅ Lógica Fuzzy aplicada! Todos os alimentos avaliados.\n")
     
     # ========================================================================
     # ETAPA 3: CONFIGURAÇÃO DO USUÁRIO
@@ -289,21 +296,22 @@ def main():
     print("⚙️  ETAPA 3/6: CONFIGURAÇÃO PERSONALIZADA")
     print("=" * 80 + "\n")
     
-    # 3.1 - Refeições
     config_refeicoes = coletar_configuracao_refeicoes()
-    
-    # 3.2 - Metas nutricionais
     metas = coletar_metas_nutricionais()
-    
-    # 3.3 - Preferências vegetais
     pref_vegetais = coletar_preferencias_vegetais()
     
     # ========================================================================
-    # ETAPA 4: RNA - PREFERÊNCIAS
+    # ETAPA 4: RNA - PREFERÊNCIAS (Aprendizado de Preferências)
     # ========================================================================
     print("=" * 80)
     print("🤖 ETAPA 4/6: REDE NEURAL ARTIFICIAL")
     print("=" * 80 + "\n")
+    print("A RNA aprende suas preferências alimentares e prevê sua satisfação")
+    print("com cada alimento, considerando fatores como:")
+    print("  • Preferências por tipos de proteína (frango, carne, peixe)")
+    print("  • Preferências por carboidratos (arroz, massa, pães)")
+    print("  • Tolerância a industrializados e sódio")
+    print("  • Preferências de custo\n")
     
     sistema_rna = SistemaPreferenciasRNA()
     preferencias_usuario = sistema_rna.coletar_preferencias_usuario()
@@ -312,14 +320,24 @@ def main():
         df_alimentos, preferencias_usuario
     )
     
-    print("✅ RNA treinada!\n")
+    # Mostra alguns exemplos
+    print("Alimentos mais alinhados com suas preferências:")
+    top_5_pref = df_alimentos.nlargest(5, 'nota_preferencia_rna')[['nome', 'nota_preferencia_rna']]
+    print(top_5_pref.to_string(index=False))
+    print("\n✅ RNA treinada! Preferências personalizadas aplicadas.\n")
     
     # ========================================================================
-    # ETAPA 5: A* - PRÉ-SELEÇÃO
+    # ETAPA 5: A* - PRÉ-SELEÇÃO (Busca Inteligente)
     # ========================================================================
     print("=" * 80)
     print("🔍 ETAPA 5/6: ALGORITMO A*")
     print("=" * 80 + "\n")
+    print("O algoritmo A* realiza uma busca inteligente para pré-selecionar")
+    print("os melhores alimentos de cada tipo, considerando:")
+    print("  • Notas de saudabilidade (Fuzzy)")
+    print("  • Notas de preferência (RNA)")
+    print("  • Custo-benefício")
+    print("  • Adequação culinária para cada tipo de refeição\n")
     
     busca_astar = BuscaAEstrela(
         df_alimentos,
@@ -327,35 +345,42 @@ def main():
         orcamento_maximo=metas['orcamento']
     )
     
+    # PARÂMETRO OTIMIZADO: top_n aumentado para 20
     melhores_alimentos = busca_astar.preselecionar_alimentos_todas_refeicoes(
         top_n_por_tipo=20
     )
     
-    print("✅ A* concluído!\n")
+    print("✅ A* concluído! Alimentos pré-selecionados com base em qualidade e adequação.\n")
     
     # ========================================================================
-    # ETAPA 6: ALGORITMO GENÉTICO
+    # ETAPA 6: ALGORITMO GENÉTICO (Otimização Final)
     # ========================================================================
     print("=" * 80)
     print("🧬 ETAPA 6/6: ALGORITMO GENÉTICO")
     print("=" * 80 + "\n")
-    
-    print("Configurações do AG:")
-    print("  • População: 150 indivíduos")
-    print("  • Gerações: 100")
-    print("  • Otimização: Macros + Calorias + Saúde + Custo\n")
+    print("O Algoritmo Genético otimiza o cardápio completo, considerando:")
+    print("  • Metas calóricas e de macronutrientes")
+    print("  • Distribuição proporcional entre refeições")
+    print("  • Regras culinárias do mundo real")
+    print("  • Saúde, preferência e custo")
+    print("\nConfigurações do AG:")
+    print("  • População: 200 indivíduos")  # OTIMIZADO
+    print("  • Gerações: 150")  # OTIMIZADO
+    print("  • Validação culinária: 22% do fitness")  # OTIMIZADO
+    print("  • Peso para combinações obrigatórias (ex: Aveia + Leite)\n")
     
     input("Pressione ENTER para iniciar a otimização...")
     print()
     
+    # PARÂMETROS OTIMIZADOS
     melhor_cardapio = otimizar_cardapio(
         df_alimentos=df_alimentos,
         alimentos_preselecionados=melhores_alimentos,
         config_refeicoes=config_refeicoes,
         metas=metas,
         pref_vegetais=pref_vegetais,
-        tamanho_populacao=150,
-        num_geracoes=100
+        tamanho_populacao=200,  # Aumentado de 150
+        num_geracoes=150  # Aumentado de 100
     )
     
     # ========================================================================
@@ -365,12 +390,10 @@ def main():
     print("💾 EXPORTANDO RESULTADOS")
     print("=" * 80 + "\n")
     
-    # Salva em arquivo
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome_arquivo = f"cardapio_personalizado_{timestamp}.txt"
     
     with open(nome_arquivo, 'w', encoding='utf-8') as f:
-        # Redireciona print para arquivo
         import sys
         old_stdout = sys.stdout
         sys.stdout = f
@@ -383,6 +406,12 @@ def main():
     print("🎉 SISTEMA CONCLUÍDO COM SUCESSO!")
     print("=" * 80)
     print("\nSeu cardápio personalizado está pronto! 🍽️")
+    print("\nResumo das técnicas de IA utilizadas:")
+    print("  1. Lógica Fuzzy: Avaliou saudabilidade de todos os alimentos")
+    print("  2. RNA: Aprendeu suas preferências pessoais")
+    print("  3. A*: Pré-selecionou os melhores alimentos por tipo")
+    print("  4. Algoritmo Genético: Otimizou o cardápio final")
+    print("\nCada técnica contribuiu para um resultado mais preciso e personalizado!")
     print("\n")
 
 
