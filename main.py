@@ -1,5 +1,5 @@
 """
-Sistema de Recomendação de Cardápio Saudável V2
+Sistema de Recomendação de Cardápio Saudável
 Com Refeições Compostas e Controle de Macros
 
 Autores: Cristian, Marco, Pedro e William
@@ -7,18 +7,18 @@ Professor: Marcos Sulzbach Morgenstern
 """
 
 from datetime import datetime
-
 from data.dados_alimentos import criar_base_dados
 from algoritmos.fuzzy_saudavel import aplicar_logica_fuzzy
 from algoritmos.rna_preferencias import SistemaPreferenciasRNA
 from algoritmos.busca_a_star import BuscaAEstrela
-from algoritmos.algoritmo_genetico import otimizar_cardapio_v2
+from algoritmos.algoritmo_genetico import otimizar_cardapio
 from utils.formatacao import exibir_cardapio_nutricionista
-from utils.validacao_input import validar_porcentagens, validar_numero
+from utils.validacao_input import validar_numero
+from utils.tmb_calculator import calcular_tmb
 
 
 def exibir_cabecalho():
-    """Exibe o cabeçalho bonito do sistema."""
+    """Exibe o cabeçalho do sistema."""
     print("\n" + "=" * 80)
     print(" " * 15 + "🍽️  SISTEMA DE RECOMENDAÇÃO DE CARDÁPIO SAUDÁVEL")
     print("=" * 80)
@@ -32,10 +32,10 @@ def coletar_configuracao_refeicoes():
     """
     Coleta quantas refeições o usuário quer e seus nomes/distribuição.
     """
-    print("=" * 80)
+    print("-" * 80)
     print("🍴 CONFIGURAÇÃO DAS REFEIÇÕES")
-    print("=" * 80 + "\n")
-    
+    print("-" * 80)
+
     # Número de refeições
     while True:
         num_refeicoes = validar_numero(
@@ -52,7 +52,7 @@ def coletar_configuracao_refeicoes():
     porcentagens = []
     
     print("Agora vamos definir cada refeição:")
-    print("(Ex: Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia)\n")
+    print("Tipos: Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Janta, Ceia\n")
     
     num_refeicoes = int(num_refeicoes)
     for i in range(num_refeicoes):
@@ -90,57 +90,109 @@ def coletar_metas_nutricionais():
     """
     Coleta meta de calorias, macros e orçamento.
     """
-    print("=" * 80)
-    print("🎯 METAS NUTRICIONAIS")
-    print("=" * 80 + "\n")
-    
+    print("-" * 80)
+    print("🎯 CÁLCULO DA TAXA METABÓLICA BASAL (TMB)")
+    print("-" * 80)
+    print("Vamos coletar informações como peso, idade, para calcularmos suas necessidades nutricionais.\n")
+
+    calculo_basal = []
+
+    calculo_basal.append(validar_numero(
+        "Qual é o seu peso atual? (kg): ",
+        0, 500, float
+        )
+    )
+    calculo_basal.append(validar_numero(
+        "Qual é a sua altura? (cm): ",
+        0, 250, float
+        )
+    )
+    calculo_basal.append(validar_numero(
+        "Qual é a sua idade? (anos): ",
+        0, 120, int
+        )
+    )
+    calculo_basal.append(validar_numero(
+        "Qual é o seu sexo? (1 para masculino, 2 para feminino): ",
+        1, 2, int
+        )
+    )
+    calculo_basal.append(validar_numero(
+        "Dentro das seguintes opções:\n\n" \
+        "1- Sedentário (pouco ou nenhum exercício);\n" \
+        "2- Levemente ativo (exercício leve 1-3 dias/semana);\n" \
+        "3- Moderadamente ativo (exercício moderado 3-5 dias/semana);\n" \
+        "4- Muito ativo (exercício pesado 6-7 dias/semana);\n"\
+        "5- Extremamente ativo (trabalho físico pesado ou treino 2x dia);\n\n" \
+        "Qual é o seu nível de atividade física? (1-5): ",
+        1, 5, int
+        )
+    )
+
+    calculo_basal = calcular_tmb(calculo_basal)
+
     # Meta de calorias
+    print("\n" + "-" * 80)
     print("📊 META DE CALORIAS DIÁRIAS")
-    print("   (1500-1800: perda de peso | 2000-2200: manutenção | 2500+: ganho de massa)\n")
+    print("-" * 80)
+    print("Com base no seu TMB e nível de atividade, temos as seguintes recomendações:")
+    print(f"{calculo_basal[1]-500:.0f}-{calculo_basal[1]-200:.0f}: perda de peso | {calculo_basal[1]:.0f}: manutenção | {calculo_basal[1]+200:.0f}+: ganho de massa\n")
     
     meta_calorias = validar_numero(
         "Digite sua meta de calorias diárias: ",
-        1000, 5000, float
+        1000, 8000, float
     )
     
     # Macros
     print("\n" + "-" * 80)
     print("🥗 DISTRIBUIÇÃO DE MACRONUTRIENTES")
     print("-" * 80)
-    print("Defina a porcentagem de cada macronutriente nas calorias diárias.")
-    print("(A soma DEVE ser 100%)\n")
-    print("Exemplos comuns:")
-    print("  • Balanceado: 50% Carbo / 30% Prot / 20% Gord")
-    print("  • Low-carb: 30% Carbo / 40% Prot / 30% Gord")
-    print("  • High-carb: 60% Carbo / 20% Prot / 20% Gord\n")
+    print("Vamos definir a porcentagem de cada macronutriente nas calorias diárias.")
+    print("Temos algumas opções de estilos de dieta:\n")
+
+    print("--- Estilos de Vida Comuns ---")
+    print("  1. Equilibrada (Padrão OMS):      50% Carbo / 25% Prot / 25% Gord")
+    print("  2. High-carb (Ganho/Energia):     60% Carbo / 20% Prot / 20% Gord")
+    print("  3. Low-carb (Secar leve):         30% Carbo / 40% Prot / 30% Gord")
+
+    print("\n--- Focados em Estética/Treino ---")
+    print("  4. Cetogênica (Keto/Gordura):      10% Carbo / 30% Prot / 60% Gord")
+    print("  5. High-Protein (Definição máx):  25% Carbo / 45% Prot / 30% Gord")
+    print("  6. Zona (Controle Hormonal):      40% Carbo / 30% Prot / 30% Gord\n")
     
-    while True:
-        pct_carbo = validar_numero("  % Carboidratos: ", 10, 80, float)
-        pct_prot = validar_numero("  % Proteínas: ", 10, 60, float)
-        pct_gord = validar_numero("  % Gorduras: ", 10, 60, float)
-        
-        total = pct_carbo + pct_prot + pct_gord
-        if abs(total - 100) < 0.01:
-            print(f"\n✅ Total: {total:.1f}% - Perfeito!\n")
-            break
-        else:
-            print(f"\n⚠️  Total: {total:.1f}% - Deve ser 100%! Tente novamente.\n")
+    opcoes_dieta = {
+    1: {"nome": "Equilibrada",   "c": 50, "p": 25, "g": 25},
+    2: {"nome": "High-carb",     "c": 60, "p": 20, "g": 20},
+    3: {"nome": "Low-carb",      "c": 30, "p": 40, "g": 30},
+    4: {"nome": "Cetogênica",    "c": 10,  "p": 30, "g": 60},
+    5: {"nome": "High-Protein",  "c": 25, "p": 45, "g": 30},
+    6: {"nome": "Zona",          "c": 40, "p": 30, "g": 30},
+    }
+
+    # Exemplo de uso:
+    escolha_dieta = int(input("Escolha o número do seu estilo de dieta (1-6): "))
+    macros = opcoes_dieta[escolha_dieta]
+
+    print(f"\nVocê escolheu: {macros['nome']}")
+    print(f"Carbos: {macros['c']}%, Proteínas: {macros['p']}%, Gorduras: {macros['g']}%")
     
     # Calcula gramas de cada macro
     # 1g Carbo = 4 kcal, 1g Prot = 4 kcal, 1g Gord = 9 kcal
-    gramas_carbo = (meta_calorias * (pct_carbo / 100)) / 4
-    gramas_prot = (meta_calorias * (pct_prot / 100)) / 4
-    gramas_gord = (meta_calorias * (pct_gord / 100)) / 9
+    gramas_carbo = (meta_calorias * (macros['c'] / 100)) / 4
+    gramas_prot = (meta_calorias * (macros['p'] / 100)) / 4
+    gramas_gord = (meta_calorias * (macros['g'] / 100)) / 9
     
-    print("📋 Resumo dos Macros:")
-    print(f"   • Carboidratos: {gramas_carbo:.0f}g ({pct_carbo:.0f}%)")
-    print(f"   • Proteínas: {gramas_prot:.0f}g ({pct_prot:.0f}%)")
-    print(f"   • Gorduras: {gramas_gord:.0f}g ({pct_gord:.0f}%)\n")
+    print("\n📋 Resumo dos Macros:")
+    print(f"   • Carboidratos: {gramas_carbo:.0f}g ({macros['c']:.0f}%)")
+    print(f"   • Proteínas: {gramas_prot:.0f}g ({macros['p']:.0f}%)")
+    print(f"   • Gorduras: {gramas_gord:.0f}g ({macros['g']:.0f}%)\n")
     
     # Orçamento
     print("-" * 80)
     print("💰 ORÇAMENTO MÁXIMO DIÁRIO")
-    print("   (Média brasileira: R$ 30-60 por dia)\n")
+    print("-" * 80)
+    print("Defina seu orçamento máximo diário para alimentação.")
+    print("(Média brasileira: R$ 30-60 por dia)\n")
     
     orcamento = validar_numero(
         "Digite seu orçamento máximo diário: R$ ",
@@ -151,9 +203,9 @@ def coletar_metas_nutricionais():
     
     return {
         'meta_calorias': meta_calorias,
-        'pct_carbo': pct_carbo,
-        'pct_prot': pct_prot,
-        'pct_gord': pct_gord,
+        'pct_carbo': macros['c'],
+        'pct_prot': macros['p'],
+        'pct_gord': macros['g'],
         'gramas_carbo': gramas_carbo,
         'gramas_prot': gramas_prot,
         'gramas_gord': gramas_gord,
@@ -165,9 +217,9 @@ def coletar_preferencias_vegetais():
     """
     Coleta preferências sobre vegetais/frutas.
     """
-    print("=" * 80)
+    print("-" * 80)
     print("🥬 PREFERÊNCIAS DE VEGETAIS E FRUTAS")
-    print("=" * 80 + "\n")
+    print("-" * 80 + "\n")
     
     print("Vegetais e frutas são importantes para uma alimentação saudável!")
     print("Como você prefere incluí-los?\n")
@@ -203,12 +255,12 @@ def coletar_preferencias_vegetais():
 
 def main():
     """
-    Função principal - Pipeline completo V2
+    Função principal - Pipeline completo
     """
     
     exibir_cabecalho()
     
-    print("🚀 Iniciando Sistema de Recomendação de Cardápio V2...\n")
+    print("🚀 Iniciando Sistema de Recomendação de Cardápio...\n")
     
     # ========================================================================
     # ETAPA 1: CARREGAMENTO DOS DADOS
@@ -282,7 +334,7 @@ def main():
     print("✅ A* concluído!\n")
     
     # ========================================================================
-    # ETAPA 6: ALGORITMO GENÉTICO V2
+    # ETAPA 6: ALGORITMO GENÉTICO
     # ========================================================================
     print("=" * 80)
     print("🧬 ETAPA 6/6: ALGORITMO GENÉTICO")
@@ -296,7 +348,7 @@ def main():
     input("Pressione ENTER para iniciar a otimização...")
     print()
     
-    melhor_cardapio = otimizar_cardapio_v2(
+    melhor_cardapio = otimizar_cardapio(
         df_alimentos=df_alimentos,
         alimentos_preselecionados=melhores_alimentos,
         config_refeicoes=config_refeicoes,
@@ -313,9 +365,6 @@ def main():
     print("💾 EXPORTANDO RESULTADOS")
     print("=" * 80 + "\n")
     
-    # Exibe cardápio formatado
-    exibir_cardapio_nutricionista(melhor_cardapio, metas, config_refeicoes)
-    
     # Salva em arquivo
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome_arquivo = f"cardapio_personalizado_{timestamp}.txt"
@@ -330,17 +379,11 @@ def main():
     
     print(f"✅ Cardápio salvo em: {nome_arquivo}")
     
-    # Salva CSV detalhado
-    df_cardapio = melhor_cardapio.exportar_para_dataframe()
-    csv_filename = f"cardapio_detalhado_{timestamp}.csv"
-    df_cardapio.to_csv(csv_filename, index=False, encoding='utf-8-sig')
-    print(f"✅ Detalhes salvos em: {csv_filename}")
-    
     print("\n" + "=" * 80)
     print("🎉 SISTEMA CONCLUÍDO COM SUCESSO!")
     print("=" * 80)
     print("\nSeu cardápio personalizado está pronto! 🍽️")
-    print("=" * 80 + "\n")
+    print("\n")
 
 
 if __name__ == "__main__":

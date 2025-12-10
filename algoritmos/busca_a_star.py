@@ -1,6 +1,6 @@
 import pandas as pd
 import heapq
-from typing import List, Dict, Tuple, Set, Optional
+from typing import List, Dict, Tuple, Set, Optional, cast
 from dataclasses import dataclass, field
 
 # ============================================================================
@@ -35,7 +35,7 @@ class BuscaAEstrela:
 
     def __init__(self, df_alimentos: pd.DataFrame, meta_calorias: float,
                  orcamento_maximo: float, pesos: Optional[Dict[str, float]] = None):
-        self.df = df_alimentos
+        self.df: pd.DataFrame = df_alimentos
         self.meta_calorias = meta_calorias
         self.orcamento = orcamento_maximo
 
@@ -172,7 +172,7 @@ class BuscaAEstrela:
                                            max_alimentos_selecao: int = 5,
                                            max_iteracoes: int = 10000) -> List[int]:
         """
-        Usa A* verdadeiro para encontrar a melhor combinação de alimentos.
+        Usa A* para encontrar a melhor combinação de alimentos.
         
         Args:
             tipo_refeicao: tipo de refeição a buscar
@@ -186,7 +186,7 @@ class BuscaAEstrela:
         print(f"🔍 A* buscando melhores alimentos para: {tipo_refeicao}")
 
         # Filtra alimentos do tipo específico
-        df_tipo = self.df[self.df['tipo'] == tipo_refeicao].copy()
+        df_tipo = cast(pd.DataFrame, self.df[self.df['tipo'] == tipo_refeicao].copy())
 
         if len(df_tipo) == 0:
             print(f"⚠️  Nenhum alimento encontrado do tipo '{tipo_refeicao}'")
@@ -198,7 +198,7 @@ class BuscaAEstrela:
             df_tipo['nota_preferencia_rna'] * self.pesos['preferencia'] -
             (df_tipo['custo'] / max(df_tipo['custo'].max(), 1)) * self.pesos['custo']
         )
-        df_tipo_sorted = df_tipo.sort_values('_score_inicial', ascending=False)
+        df_tipo_sorted = df_tipo.sort_values(by='_score_inicial', ascending=False)
         indices_disponiveis = df_tipo_sorted.index.tolist()
         
         # Limita candidatos para melhor performance
@@ -342,9 +342,9 @@ class BuscaAEstrela:
         """
         tipos_refeicao = self.df['tipo'].unique()
 
-        print("=" * 60)
+        print("-" * 60)
         print("🎯 EXECUTANDO ALGORITMO A* - PRÉ-SELEÇÃO INTELIGENTE")
-        print("=" * 60 + "\n")
+        print("-" * 60 + "\n")
 
         # Limpa cache entre execuções
         self._cache_metricas.clear()
@@ -355,8 +355,8 @@ class BuscaAEstrela:
             melhores = self.buscar_melhores_alimentos_por_tipo(tipo, top_n_por_tipo)
             melhores_por_tipo[tipo] = melhores
 
-        print("=" * 60)
-        print("✅ A* concluído! Alimentos pré-selecionados por tipo de refeição.")
-        print("=" * 60 + "\n")
+        print("-" * 60)
+        print("Alimentos pré-selecionados por tipo de refeição.")
+        print("-" * 60 + "\n")
         
         return melhores_por_tipo

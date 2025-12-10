@@ -5,6 +5,7 @@ Exibe cardápios no estilo profissional de nutricionista
 
 from datetime import datetime
 from typing import Dict, List, Tuple
+from data.regras_culinarias import normalizar_texto
 
 
 def exibir_cardapio_nutricionista(cardapio, metas: Dict, config_refeicoes: List[Tuple]):
@@ -119,20 +120,20 @@ def exibir_cardapio_nutricionista(cardapio, metas: Dict, config_refeicoes: List[
 
 
 def _get_emoji_refeicao(nome: str) -> str:
-    """Retorna emoji apropriado para cada refeição."""
-    nome_lower = nome.lower()
+    """Retorna emoji apropriado para cada refeição (normalizado, sem acentos)."""
+    nome_norm = normalizar_texto(nome)
     
-    if 'café' in nome_lower or 'manhã' in nome_lower and 'lanche' not in nome_lower:
+    if 'cafe' in nome_norm or ('manha' in nome_norm and 'lanche' not in nome_norm):
         return "☀️"
-    elif 'lanche' in nome_lower and 'manhã' in nome_lower:
+    elif 'lanche' in nome_norm and 'manha' in nome_norm:
         return "🍎"
-    elif 'almoço' in nome_lower or 'almo' in nome_lower:
+    elif 'almoco' in nome_norm or 'almo' in nome_norm:
         return "🍽️"
-    elif 'lanche' in nome_lower and 'tarde' in nome_lower:
+    elif 'lanche' in nome_norm and 'tarde' in nome_norm:
         return "🥤"
-    elif 'jantar' in nome_lower:
+    elif 'jantar' in nome_norm:
         return "🌙"
-    elif 'ceia' in nome_lower:
+    elif 'ceia' in nome_norm:
         return "🌃"
     else:
         return "🍴"

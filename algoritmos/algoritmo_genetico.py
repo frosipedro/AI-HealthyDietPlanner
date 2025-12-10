@@ -1,78 +1,27 @@
 """
-Algoritmo Genético V2 - Refeições Compostas com Controle de Macros
+Algoritmo Genético - Refeições Compostas com Controle de Macros e Regras Culinárias do Mundo Real
 """
 
-import numpy as np
-import pandas as pd
+import numpy as np 
+import pandas as pd 
 import random
 from typing import List, Dict, Tuple
+from data.regras_culinarias import (
+    obter_categoria_culinaria,
+    obter_regras_refeicao,
+    obter_limites_gramatura,
+    alimento_permitido_na_refeicao,
+    validar_composicao_refeicao,
+    GRAMATURA_REALISTA
+)
 
 
 # ============================================================================
-# CONFIGURAÇÕES DE GRAMATURA POR TIPO DE ALIMENTO (BASE)
-# Estes valores são para uma refeição de ~600 kcal (referência)
-# Serão escalados dinamicamente conforme as calorias-alvo
+# CLASSES PRINCIPAIS
 # ============================================================================
-
-LIMITES_BASE_GRAMATURA = {
-    'proteina': {'min': 80, 'max': 200, 'ideal': 120},
-    'carboidrato': {'min': 50, 'max': 200, 'ideal': 100},
-    'gordura': {'min': 5, 'max': 30, 'ideal': 10},
-    'vegetal': {'min': 50, 'max': 150, 'ideal': 100},
-    'fruta': {'min': 80, 'max': 200, 'ideal': 120},
-    'industrializado': {'min': 30, 'max': 100, 'ideal': 50},
-    'refeicao': {'min': 100, 'max': 400, 'ideal': 200}
-}
-
-# Calorias de referência para escalonamento
-CALORIAS_REFERENCIA_REFEICAO = 600  # Refeição média
-
-
-def calcular_limites_dinamicos(tipo_alimento: str, calorias_alvo_refeicao: float) -> Dict[str, float]:
-    """
-    Calcula limites de gramatura dinamicamente baseado nas calorias-alvo.
-    
-    Args:
-        tipo_alimento: Tipo do alimento
-        calorias_alvo_refeicao: Calorias-alvo da refeição
-    
-    Returns:
-        Dict com limites ajustados {'min': x, 'max': y, 'ideal': z}
-    """
-    limites_base = LIMITES_BASE_GRAMATURA.get(tipo_alimento, {'min': 30, 'max': 300, 'ideal': 100})
-    
-    # Vegetais e frutas NÃO escalam (sempre porção padrão)
-    if tipo_alimento in ['vegetal', 'fruta']:
-        return limites_base.copy()
-    
-    # Calcula fator de escala baseado nas calorias
-    fator_escala = calorias_alvo_refeicao / CALORIAS_REFERENCIA_REFEICAO
-    
-    # Limita o escalonamento para evitar valores absurdos
-    # Máximo 3x e mínimo 0.5x dos valores base
-    fator_escala = max(0.5, min(3.0, fator_escala))
-    
-    # Aplica escala aos limites
-    limites_ajustados = {
-        'min': limites_base['min'] * fator_escala,
-        'max': limites_base['max'] * fator_escala,
-        'ideal': limites_base['ideal'] * fator_escala
-    }
-    
-    # Garante que min não seja menor que 30g
-    limites_ajustados['min'] = max(30, limites_ajustados['min'])
-    
-    # Para gorduras, mantém um limite máximo absoluto
-    if tipo_alimento == 'gordura':
-        limites_ajustados['max'] = min(50, limites_ajustados['max'])
-    
-    return limites_ajustados
-
-
 class CardapioCompleto:
-    """
-    Representa um cardápio completo do dia com refeições compostas.
-    """
+    """Representa um cardápio completo com várias refeições."""
+        
     def __init__(self, refeicoes: Dict[str, List[Dict]]):
         """
         Args:
@@ -81,19 +30,19 @@ class CardapioCompleto:
         self.refeicoes = refeicoes
         self.fitness = 0.0
         self.metricas = {}
-    
+
     def calcular_totais(self) -> Dict:
         """Calcula totais nutricionais do dia."""
-        totais = {
-            'calorias': 0,
-            'proteinas': 0,
-            'carboidratos': 0,
-            'gorduras': 0,
-            'fibras': 0,
-            'sodio': 0,
-            'custo': 0,
-            'saude_media': 0,
-            'preferencia_media': 0
+        totais: Dict = {
+            'calorias': 0.0,
+            'proteinas': 0.0,
+            'carboidratos': 0.0,
+            'gorduras': 0.0,
+            'fibras': 0.0,
+            'sodio': 0.0,
+            'custo': 0.0,
+            'saude_media': 0.0,
+            'preferencia_media': 0.0
         }
         
         total_alimentos = 0
@@ -118,7 +67,7 @@ class CardapioCompleto:
             totais['preferencia_media'] = soma_pref / total_alimentos
         
         return totais
-    
+
     def exportar_para_dataframe(self) -> pd.DataFrame:
         """Exporta cardápio para DataFrame."""
         linhas = []
@@ -132,7 +81,7 @@ class CardapioCompleto:
         return pd.DataFrame(linhas)
 
 
-class AlgoritmoGeneticoV2:
+class AlgoritmoGenetico:
     """
     Algoritmo Genético para otimizar cardápios com refeições compostas.
     """
@@ -174,121 +123,252 @@ class AlgoritmoGeneticoV2:
     
     def _gerar_refeicao_aleatoria(self, calorias_alvo: float, nome_ref: str) -> List[Dict]:
         """
-        Gera uma refeição aleatória tentando atingir as calorias.
-        MELHORADO: Agora usa limites dinâmicos que escalam com as calorias.
+        Gera uma refeição aleatória seguindo REGRAS CULINÁRIAS DO MUNDO REAL.
+        
+        Args:
+            calorias_alvo: Meta de calorias para esta refeição
+            nome_ref: Nome da refeição (ex: "Café da Manhã", "Almoço")
+        
+        Returns:
+            Lista de alimentos escalados
         """
         alimentos_ref = []
         calorias_atual = 0
         
-        # Separa tipos disponíveis
-        tipos_disponiveis = list(self.alimentos_pre.keys())
-        tipos_principais = [t for t in tipos_disponiveis if t in ['proteina', 'carboidrato']]
-        tipos_complementares = [t for t in tipos_disponiveis if t in ['vegetal', 'fruta']]
+        # Obtém as regras para esta refeição
+        regras = obter_regras_refeicao(nome_ref)
+        estrutura = regras.get('estrutura', {})
         
-        # Sempre inclui proteína e carboidrato em refeições principais
-        if 'lanche' not in nome_ref.lower():
-            # REFEIÇÃO PRINCIPAL (Almoço/Jantar)
-            
-            # 1. PROTEÍNA (contribui ~40-50% das calorias)
-            if 'proteina' in self.alimentos_pre and self.alimentos_pre['proteina']:
-                idx = random.choice(self.alimentos_pre['proteina'])
-                
-                # Calcula limites dinâmicos
-                limites = calcular_limites_dinamicos('proteina', calorias_alvo)
-                gramas = random.randint(int(limites['min']), int(limites['max']))
-                
-                alimentos_ref.append(self._escalar_alimento(self.df.loc[idx], gramas, calorias_alvo))
-                calorias_atual += alimentos_ref[-1]['calorias']
-            
-            # 2. CARBOIDRATO (contribui ~30-40% das calorias)
-            if 'carboidrato' in self.alimentos_pre and self.alimentos_pre['carboidrato']:
-                idx = random.choice(self.alimentos_pre['carboidrato'])
-                calorias_restantes = calorias_alvo - calorias_atual
-                alimento_base = self.df.loc[idx]
-                
-                # Calcula limites dinâmicos
-                limites = calcular_limites_dinamicos('carboidrato', calorias_alvo)
-                
-                if alimento_base['calorias'] > 0:
-                    gramas_calculada = (calorias_restantes * 0.6 / alimento_base['calorias']) * 100
-                    gramas = max(limites['min'], min(limites['max'], gramas_calculada))
-                else:
-                    gramas = limites['ideal']
-                
-                alimentos_ref.append(self._escalar_alimento(alimento_base, gramas, calorias_alvo))
-                calorias_atual += alimentos_ref[-1]['calorias']
-            
-            # 3. VEGETAL (sempre porção padrão - não escala)
-            if self.pref_veg['max_vegetais'] > 0 and tipos_complementares:
-                tipo_escolhido = random.choice(tipos_complementares)
-                if tipo_escolhido in self.alimentos_pre and self.alimentos_pre[tipo_escolhido]:
-                    idx = random.choice(self.alimentos_pre[tipo_escolhido])
-                    limites = calcular_limites_dinamicos(tipo_escolhido, calorias_alvo)
-                    gramas = limites['ideal']
-                    alimentos_ref.append(self._escalar_alimento(self.df.loc[idx], gramas, calorias_alvo))
-            
-            # 4. Segundo vegetal/fruta se configurado
-            if self.pref_veg['max_vegetais'] > 1 and random.random() < 0.5:
-                if tipos_complementares:
-                    tipo_escolhido = random.choice(tipos_complementares)
-                    if tipo_escolhido in self.alimentos_pre and self.alimentos_pre[tipo_escolhido]:
-                        idx = random.choice(self.alimentos_pre[tipo_escolhido])
-                        limites = calcular_limites_dinamicos(tipo_escolhido, calorias_alvo)
-                        gramas = limites['ideal']
-                        alimentos_ref.append(self._escalar_alimento(self.df.loc[idx], gramas, calorias_alvo))
-        
+        # Se tem estrutura complexa (ex: almoço com refeição_completa ou refeicao_pronta)
+        if 'refeicao_completa' in estrutura:
+            # 80% das vezes faz refeição completa, 20% prato pronto
+            if random.random() < 0.8:
+                est = estrutura['refeicao_completa']
+            else:
+                est = estrutura.get('refeicao_pronta', estrutura['refeicao_completa'])
         else:
-            # LANCHE (mais simples, 1-2 itens)
-            num_itens = random.randint(1, 2)
-            cal_por_item = calorias_alvo / num_itens
+            est = estrutura
+        
+        # Coleta alimentos OBRIGATÓRIOS
+        categorias_obrigatorias = est.get('obrigatorio', [])
+        categorias_opcionais = est.get('opcional', [])
+        
+        # NOVO: Aumenta número de opcionais se há poucas refeições no dia
+        num_total_refeicoes = len(self.config_refeicoes)
+        if num_total_refeicoes <= 4:
+            # Com poucas refeições, precisa de mais componentes
+            num_opcionais = random.randint(1, min(4, len(categorias_opcionais)))
+        else:
+            # Padrão: 0-2 opcionais
+            num_opcionais = random.randint(0, min(2, len(categorias_opcionais)))
+        
+        # Distribui calorias entre componentes
+        num_obrigatorios = len(categorias_obrigatorias)
+        total_componentes = num_obrigatorios + num_opcionais
+        
+        if total_componentes == 0:
+            # Fallback: cria refeição genérica
+            return self._gerar_refeicao_generica(calorias_alvo, nome_ref, regras)
+        
+        # Distribui calorias de forma inteligente
+        calorias_por_componente = calorias_alvo / total_componentes
+        
+        # Adiciona componentes OBRIGATÓRIOS
+        for categoria in categorias_obrigatorias:
+            alimento = self._escolher_alimento_por_categoria(
+                categoria, 
+                calorias_por_componente, 
+                nome_ref
+            )
+            if alimento:
+                alimentos_ref.append(alimento)
+                calorias_atual += alimento['calorias']
+        
+        # Adiciona componentes OPCIONAIS
+        categorias_op_escolhidas = random.sample(categorias_opcionais, num_opcionais)
+        for categoria in categorias_op_escolhidas:
+            alimento = self._escolher_alimento_por_categoria(
+                categoria,
+                calorias_por_componente,
+                nome_ref
+            )
+            if alimento:
+                alimentos_ref.append(alimento)
+                calorias_atual += alimento['calorias']
+        
+        # Ajuste fino: se faltam calorias, aumenta porções proporcionalmente
+        if calorias_atual > 0 and abs(calorias_atual - calorias_alvo) > 50:
+            fator_ajuste = calorias_alvo / calorias_atual
             
-            tipos_possiveis = tipos_principais.copy()
-            if self.pref_veg['max_vegetais'] > 0:
-                tipos_possiveis.extend(tipos_complementares)
+            # NOVO: Permite ajuste maior se há poucas refeições
+            num_total_refeicoes = len(self.config_refeicoes)
+            if num_total_refeicoes <= 4:
+                fator_ajuste = max(0.5, min(2.0, fator_ajuste))  # Ajuste mais agressivo
+            else:
+                fator_ajuste = max(0.7, min(1.3, fator_ajuste))  # Ajuste padrão
             
-            for _ in range(num_itens):
-                if not tipos_possiveis:
-                    break
+            for i, alimento in enumerate(alimentos_ref):
+                alimento_base = self.df.loc[alimento['idx']]
+                nova_gramas = alimento['gramas'] * fator_ajuste
                 
-                tipo = random.choice(tipos_possiveis)
-                if tipo not in self.alimentos_pre or not self.alimentos_pre[tipo]:
-                    continue
+                # Respeita limites culinários (mas aumentados se necessário)
+                limites = obter_limites_gramatura(alimento['nome'])
                 
-                idx = random.choice(self.alimentos_pre[tipo])
-                alimento_base = self.df.loc[idx]
-                
-                # Calcula limites dinâmicos para lanches também
-                limites = calcular_limites_dinamicos(tipo, calorias_alvo)
-                
-                if tipo in ['vegetal', 'fruta']:
-                    gramas = limites['ideal']
+                # NOVO: Aumenta limite máximo se refeição é grande
+                calorias_refeicao_media = self.metas['meta_calorias'] / num_total_refeicoes
+                if calorias_refeicao_media > 800:
+                    limites_max_ajustado = int(limites['max'] * 1.5)
                 else:
-                    if alimento_base['calorias'] > 0:
-                        gramas_calculada = (cal_por_item / alimento_base['calorias']) * 100
-                        gramas = max(limites['min'], min(limites['max'], gramas_calculada))
-                    else:
-                        gramas = limites['ideal']
+                    limites_max_ajustado = limites['max']
                 
-                alimentos_ref.append(self._escalar_alimento(alimento_base, gramas, calorias_alvo))
+                nova_gramas = max(limites['min'], min(limites_max_ajustado, nova_gramas))
+                
+                alimentos_ref[i] = self._escalar_alimento(alimento_base, nova_gramas, calorias_alvo)
+        
+        return alimentos_ref
+    
+    def _escolher_alimento_por_categoria(self, categoria_culinaria: str, 
+                                         calorias_alvo: float, 
+                                         nome_ref: str) -> Dict | None:
+        """
+        Escolhe um alimento que pertença à categoria culinária especificada.
+        
+        Args:
+            categoria_culinaria: Ex: 'prato_principal', 'acompanhamento_base', 'lanche_leve'
+            calorias_alvo: Calorias que este alimento deve contribuir
+            nome_ref: Nome da refeição
+        
+        Returns:
+            Alimento escalado ou None se não encontrar
+        """
+        # Filtra alimentos por categoria culinária
+        candidatos = []
+        
+        for tipo_nutri, indices in self.alimentos_pre.items():
+            for idx in indices:
+                alimento_nome = str(self.df.loc[idx, 'nome'])
+                cat_culinaria = obter_categoria_culinaria(alimento_nome)
+                
+                if cat_culinaria == categoria_culinaria:
+                    # Verifica se é permitido nesta refeição
+                    if alimento_permitido_na_refeicao(alimento_nome, nome_ref):
+                        candidatos.append(idx)
+        
+        if not candidatos:
+            return None
+        
+        # Escolhe aleatoriamente
+        idx_escolhido = random.choice(candidatos)
+        alimento_base = self.df.loc[idx_escolhido]
+        
+        # Calcula gramatura baseada nas calorias-alvo e limites culinários
+        limites = obter_limites_gramatura(str(alimento_base['nome']))
+        
+            try:
+                calorias_value = float(alimento_base['calorias'])  # type: ignore
+            except (ValueError, TypeError):
+                calorias_value = 0.0
+            
+            if calorias_value > 0:
+                # Calcula gramas necessárias para atingir calorias
+                gramas_calculada = (calorias_alvo / calorias_value) * 100
+                
+                # NOVO: Aumenta limite se há poucas refeições
+                num_total_refeicoes = len(self.config_refeicoes)
+                if num_total_refeicoes <= 4:
+                    limites_max_ajustado = int(limites['max'] * 1.5)
+                else:
+                    limites_max_ajustado = limites['max']
+                
+                gramas = max(limites['min'], min(limites_max_ajustado, gramas_calculada))
+            else:
+                gramas = limites['ideal']
+            
+            return self._escalar_alimento(alimento_base, gramas, calorias_alvo)  # type: ignore    def _gerar_refeicao_generica(self, calorias_alvo: float, nome_ref: str, regras: dict) -> List[Dict]:
+        """Fallback: gera refeição genérica quando não há estrutura definida."""
+        alimentos_ref = []
+        
+        # Pega tipos permitidos
+        tipos_permitidos = []
+        for tipo in self.alimentos_pre.keys():
+            # Verifica se algum alimento deste tipo é permitido
+            for idx in self.alimentos_pre[tipo]:
+                if alimento_permitido_na_refeicao(str(self.df.loc[idx, 'nome']), nome_ref):
+                    tipos_permitidos.append(tipo)
+                    break
+        
+        if not tipos_permitidos:
+            tipos_permitidos = list(self.alimentos_pre.keys())
+        
+        # NOVO: Ajusta número de itens baseado no total de refeições
+        num_total_refeicoes = len(self.config_refeicoes)
+        if num_total_refeicoes <= 4:
+            num_itens = random.randint(2, 4)  # Mais itens com poucas refeições
+        else:
+            num_itens = random.randint(1, 3)  # Padrão
+        
+        cal_por_item = calorias_alvo / num_itens
+        
+        for _ in range(num_itens):
+            if not tipos_permitidos:
+                break
+            
+            tipo = random.choice(tipos_permitidos)
+            if tipo not in self.alimentos_pre or not self.alimentos_pre[tipo]:
+                continue
+            
+            # Filtra por regras da refeição
+            candidatos = [
+                idx for idx in self.alimentos_pre[tipo]
+                if alimento_permitido_na_refeicao(str(self.df.loc[idx, 'nome']), nome_ref)
+            ]
+            
+            if not candidatos:
+                continue
+            
+            idx = random.choice(candidatos)
+            alimento_base = self.df.loc[idx]
+            
+            # Usa limites culinários
+            limites = obter_limites_gramatura(str(alimento_base['nome']))
+            
+            try:
+                calorias_value = float(alimento_base['calorias'])  # type: ignore
+            except (ValueError, TypeError):
+                calorias_value = 0.0
+            
+            if calorias_value > 0:
+                gramas_calculada = (cal_por_item / calorias_value) * 100
+                
+                # NOVO: Aumenta limite se há poucas refeições
+                num_total_refeicoes = len(self.config_refeicoes)
+                if num_total_refeicoes <= 4:
+                    limites_max_ajustado = int(limites['max'] * 1.5)
+                else:
+                    limites_max_ajustado = limites['max']
+                
+                gramas = max(limites['min'], min(limites_max_ajustado, gramas_calculada))
+            else:
+                gramas = limites['ideal']
+            
+            alimentos_ref.append(self._escalar_alimento(alimento_base, gramas, calorias_alvo))  # type: ignore
         
         return alimentos_ref
     
     def _escalar_alimento(self, alimento: pd.Series, gramas: float, calorias_alvo_refeicao: float = 600) -> Dict:
         """
         Escala nutrientes proporcionalmente.
-        MELHORADO: Usa limites dinâmicos baseados nas calorias-alvo.
+        VERSÃO 3: Usa limites culinários realistas do mundo real.
         
         Args:
             alimento: Série do alimento
             gramas: Gramatura desejada
-            calorias_alvo_refeicao: Calorias-alvo da refeição (para calcular limites)
+            calorias_alvo_refeicao: Calorias-alvo da refeição (informativo)
         """
-        tipo_alimento = alimento['tipo']
+        # Usa limites culinários (não mais nutricionais)
+        limites = obter_limites_gramatura(alimento['nome'])
         
-        # Calcula limites dinâmicos
-        limites = calcular_limites_dinamicos(tipo_alimento, calorias_alvo_refeicao)
-        
-        # Valida gramatura nos limites calculados
+        # Valida gramatura nos limites culinários
         gramas = max(limites['min'], min(limites['max'], gramas))
         
         fator = gramas / 100  # Valores são por 100g
@@ -311,29 +391,31 @@ class AlgoritmoGeneticoV2:
     def calcular_fitness(self, cardapio: CardapioCompleto) -> float:
         """
         Calcula fitness multi-objetivo.
+        NOVO: Inclui penalização por refeições que não fazem sentido culinariamente.
+        NOVO: Inclui distribuição proporcional de macros por refeição.
         """
         totais = cardapio.calcular_totais()
         
-        # 1. Calorias (20%)
+        # 1. Calorias (18%)
         desvio_cal = abs(totais['calorias'] - self.metas['meta_calorias'])
         fitness_cal = max(0, 1 - (desvio_cal / self.metas['meta_calorias']))
         
-        # 2. Proteínas (20%)
+        # 2. Proteínas (18%)
         desvio_prot = abs(totais['proteinas'] - self.metas['gramas_prot'])
         fitness_prot = max(0, 1 - (desvio_prot / self.metas['gramas_prot']))
         
-        # 3. Carboidratos (20%)
+        # 3. Carboidratos (18%)
         desvio_carbo = abs(totais['carboidratos'] - self.metas['gramas_carbo'])
         fitness_carbo = max(0, 1 - (desvio_carbo / self.metas['gramas_carbo']))
         
-        # 4. Gorduras (15%)
+        # 4. Gorduras (13%)
         desvio_gord = abs(totais['gorduras'] - self.metas['gramas_gord'])
         fitness_gord = max(0, 1 - (desvio_gord / self.metas['gramas_gord']))
         
-        # 5. Saúde (10%)
+        # 5. Saúde (8%)
         fitness_saude = totais['saude_media'] / 10
         
-        # 6. Preferência (10%)
+        # 6. Preferência (8%)
         fitness_pref = totais['preferencia_media']
         
         # 7. Custo (5%)
@@ -342,15 +424,76 @@ class AlgoritmoGeneticoV2:
         else:
             fitness_custo = -0.5
         
+        # 8. VALIDAÇÃO CULINÁRIA (12% do fitness)
+        # Este é o componente que vai ensinar o algoritmo a "pensar como humano"
+        fitness_culinario = 0.0
+        num_refeicoes = len(cardapio.refeicoes)
+        
+        for nome_ref, alimentos_ref in cardapio.refeicoes.items():
+            # Prepara dados para validação
+            alimentos_info = [
+                {'nome': alimento['nome'], 'gramas': alimento['gramas']}
+                for alimento in alimentos_ref
+            ]
+            
+            # Valida composição
+            validacao = validar_composicao_refeicao(alimentos_info, nome_ref)
+            fitness_culinario += validacao['score']
+        
+        fitness_culinario /= num_refeicoes  # Média entre refeições
+        
+        # 9. NOVO: DISTRIBUIÇÃO PROPORCIONAL DE MACROS POR REFEIÇÃO (15% do fitness)
+        # Garante que cada refeição tenha macros proporcionais à sua % de calorias
+        fitness_distribuicao = 0.0
+        
+        for nome_ref, alimentos_ref in cardapio.refeicoes.items():
+            # Encontra a porcentagem de calorias desta refeição
+            pct_refeicao = None
+            for nome_config, pct in self.config_refeicoes:
+                if nome_config == nome_ref:
+                    pct_refeicao = pct / 100.0
+                    break
+            
+            if pct_refeicao is None:
+                continue
+            
+            # Calcula macros esperados para esta refeição (proporcionalmente)
+            prot_esperado = self.metas['gramas_prot'] * pct_refeicao
+            carbo_esperado = self.metas['gramas_carbo'] * pct_refeicao
+            gord_esperado = self.metas['gramas_gord'] * pct_refeicao
+            
+            # Calcula macros reais desta refeição
+            prot_real = sum(a['proteinas'] for a in alimentos_ref)
+            carbo_real = sum(a['carboidratos'] for a in alimentos_ref)
+            gord_real = sum(a['gorduras'] for a in alimentos_ref)
+            
+            # Calcula desvios (com tolerância de 30% para flexibilidade)
+            desvio_prot_ref = abs(prot_real - prot_esperado) / max(prot_esperado, 1)
+            desvio_carbo_ref = abs(carbo_real - carbo_esperado) / max(carbo_esperado, 1)
+            desvio_gord_ref = abs(gord_real - gord_esperado) / max(gord_esperado, 1)
+            
+            # Fitness desta refeição (penaliza desvios grandes)
+            fitness_ref = (
+                max(0, 1 - desvio_prot_ref) +
+                max(0, 1 - desvio_carbo_ref) +
+                max(0, 1 - desvio_gord_ref)
+            ) / 3.0
+            
+            fitness_distribuicao += fitness_ref
+        
+        fitness_distribuicao /= num_refeicoes  # Média entre refeições
+        
         # Fitness total
         fitness = (
-            0.20 * fitness_cal +
-            0.20 * fitness_prot +
-            0.20 * fitness_carbo +
-            0.15 * fitness_gord +
-            0.10 * fitness_saude +
-            0.10 * fitness_pref +
-            0.05 * fitness_custo
+            0.14 * fitness_cal +         # Reduzido de 0.16
+            0.14 * fitness_prot +        # Reduzido de 0.16
+            0.14 * fitness_carbo +       # Reduzido de 0.16
+            0.10 * fitness_gord +        # Reduzido de 0.12
+            0.08 * fitness_saude +
+            0.08 * fitness_pref +
+            0.04 * fitness_custo +
+            0.13 * fitness_culinario +   # Reduzido de 0.20
+            0.15 * fitness_distribuicao  # NOVO: garante distribuição proporcional
         )
         
         cardapio.fitness = fitness
@@ -362,6 +505,8 @@ class AlgoritmoGeneticoV2:
             'fitness_saude': fitness_saude,
             'fitness_pref': fitness_pref,
             'fitness_custo': fitness_custo,
+            'fitness_culinario': fitness_culinario,
+            'fitness_distribuicao': fitness_distribuicao,  # NOVO!
             **totais
         }
         
@@ -387,7 +532,7 @@ class AlgoritmoGeneticoV2:
     def mutacao(self, cardapio: CardapioCompleto, taxa: float = 0.2):
         """
         Mutação: altera alimentos ou quantidades.
-        MELHORADO: Usa limites dinâmicos por refeição.
+        VERSÃO 3: Usa limites culinários realistas.
         """
         for nome_ref in cardapio.refeicoes:
             if random.random() < taxa:
@@ -397,14 +542,26 @@ class AlgoritmoGeneticoV2:
                 
                 # Escolhe tipo de mutação
                 if random.random() < 0.5:
-                    # Troca um alimento
+                    # Troca um alimento MANTENDO A CATEGORIA CULINÁRIA
                     if cardapio.refeicoes[nome_ref]:
                         idx_mut = random.randrange(len(cardapio.refeicoes[nome_ref]))
                         alimento_atual = cardapio.refeicoes[nome_ref][idx_mut]
                         
-                        tipo_alimento = self.df.loc[alimento_atual['idx']]['tipo']
-                        if tipo_alimento in self.alimentos_pre and self.alimentos_pre[tipo_alimento]:
-                            novo_idx = random.choice(self.alimentos_pre[tipo_alimento])
+                        # Obtém categoria culinária do alimento atual
+                        nome_atual = alimento_atual['nome']
+                        cat_culinaria = obter_categoria_culinaria(nome_atual)
+                        
+                        # Busca substituto da mesma categoria
+                        candidatos = []
+                        for tipo_nutri, indices in self.alimentos_pre.items():
+                            for idx in indices:
+                                alimento_nome = str(self.df.loc[idx, 'nome'])
+                                if obter_categoria_culinaria(alimento_nome) == cat_culinaria:
+                                    if alimento_permitido_na_refeicao(alimento_nome, nome_ref):
+                                        candidatos.append(idx)
+                        
+                        if candidatos:
+                            novo_idx = random.choice(candidatos)
                             novo_alimento = self.df.loc[novo_idx]
                             gramas = alimento_atual['gramas']
                             
@@ -412,13 +569,13 @@ class AlgoritmoGeneticoV2:
                                 novo_alimento, gramas, calorias_alvo_ref
                             )
                 else:
-                    # Ajusta gramatura RESPEITANDO LIMITES DINÂMICOS
+                    # Ajusta gramatura RESPEITANDO LIMITES CULINÁRIOS
                     if cardapio.refeicoes[nome_ref]:
                         idx_mut = random.randrange(len(cardapio.refeicoes[nome_ref]))
                         alimento = cardapio.refeicoes[nome_ref][idx_mut]
                         
-                        tipo_alimento = self.df.loc[alimento['idx']]['tipo']
-                        limites = calcular_limites_dinamicos(tipo_alimento, calorias_alvo_ref)
+                        # Usa limites culinários
+                        limites = obter_limites_gramatura(str(alimento['nome']))
                         
                         # Varia ±20% mantendo nos limites
                         fator = random.uniform(0.8, 1.2)
@@ -453,6 +610,7 @@ class AlgoritmoGeneticoV2:
             if gen % 20 == 0 or gen == num_ger - 1:
                 print(f"Geração {gen:3d} | Fitness: {melhor.fitness:.4f} | "
                       f"Calorias: {melhor.metricas['calorias']:.0f} | "
+                      f"Culinário: {melhor.metricas['fitness_culinario']:.2f} | "
                       f"Custo: R$ {melhor.metricas['custo']:.2f}")
             
             # Nova geração
@@ -489,7 +647,7 @@ class AlgoritmoGeneticoV2:
         return self.melhor_cardapio
 
 
-def otimizar_cardapio_v2(df_alimentos: pd.DataFrame,
+def otimizar_cardapio(df_alimentos: pd.DataFrame,
                          alimentos_preselecionados: Dict[str, List[int]],
                          config_refeicoes: List[Tuple[str, float]],
                          metas: Dict,
@@ -497,9 +655,9 @@ def otimizar_cardapio_v2(df_alimentos: pd.DataFrame,
                          tamanho_populacao: int = 150,
                          num_geracoes: int = 100) -> CardapioCompleto:
     """
-    Função principal do AG V2.
+    Função principal.
     """
-    ag = AlgoritmoGeneticoV2(
+    ag = AlgoritmoGenetico(
         df_alimentos,
         alimentos_preselecionados,
         config_refeicoes,

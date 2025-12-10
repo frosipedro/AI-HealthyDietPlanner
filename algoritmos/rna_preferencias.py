@@ -27,27 +27,68 @@ class SistemaPreferenciasRNA:
 
     def coletar_preferencias_usuario(self) -> Dict:
         """
-        Coleta as preferências do usuário através de perguntas.
-        Retorna um dicionário com as preferências.
+        Coleta as preferências do usuário sobre ALIMENTOS ESPECÍFICOS.
+        Isso permite que o AG escolha entre alimentos nutricionalmente equivalentes.
         """
-        print("=" * 60)
+        print("-" * 80)
         print("🍽️  QUESTIONÁRIO DE PREFERÊNCIAS ALIMENTARES")
-        print("=" * 60)
-        print("Responda de 0 a 10 (0 = não gosto, 10 = amo)\n")
+        print("-" * 80)
+        print("Responda de 0 a 10 (0 = detesto, 10 = amo)")
+        print("Isso ajudará a escolher entre alimentos nutricionalmente similares.\n")
 
         preferencias = {}
 
-        # Preferências por macronutrientes
-        preferencias['pref_proteina'] = validar_numero("Quanto você gosta de alimentos ricos em PROTEÍNA (carnes, ovos)? ", 0, 10) / 10
-        preferencias['pref_carboidrato'] = validar_numero("Quanto você gosta de CARBOIDRATOS (massas, pães, arroz)? ", 0, 10) / 10
-        preferencias['pref_gordura'] = validar_numero("Quanto você gosta de alimentos com GORDURA (abacate, castanhas)? ", 0, 10) / 10
-        preferencias['pref_fibras'] = validar_numero("Quanto você gosta de FIBRAS (vegetais, grãos integrais)? ", 0, 10) / 10
+        # === PROTEÍNAS ===
+        print("-" * 80)
+        print("🍗 PROTEÍNAS ANIMAIS")
+        print("-" * 80)
+        preferencias['pref_frango'] = validar_numero("Quanto você gosta de FRANGO? ", 0, 10) / 10
+        preferencias['pref_carne_vermelha'] = validar_numero("Quanto você gosta de CARNE VERMELHA (boi, porco)? ", 0, 10) / 10
+        preferencias['pref_peixe'] = validar_numero("Quanto você gosta de PEIXE? ", 0, 10) / 10
+        preferencias['pref_ovos'] = validar_numero("Quanto você gosta de OVOS? ", 0, 10) / 10
+        preferencias['pref_laticinio'] = validar_numero("Quanto você gosta de LATICÍNIOS (queijo, iogurte, leite)? ", 0, 10) / 10
 
-        # Preferências por tipo
-        print("\n" + "-" * 60)
-        preferencias['pref_baixa_caloria'] = validar_numero("Prefere alimentos de BAIXA CALORIA? ", 0, 10) / 10
+        # === CARBOIDRATOS ===
+        print("\n" + "-" * 80)
+        print("🍚 CARBOIDRATOS")
+        print("-" * 80)
+        preferencias['pref_arroz'] = validar_numero("Quanto você gosta de ARROZ? ", 0, 10) / 10
+        preferencias['pref_massa'] = validar_numero("Quanto você gosta de MASSAS (macarrão)? ", 0, 10) / 10
+        preferencias['pref_paes'] = validar_numero("Quanto você gosta de PÃES? ", 0, 10) / 10
+        preferencias['pref_batata'] = validar_numero("Quanto você gosta de BATATA/TUBÉRCULOS? ", 0, 10) / 10
+        preferencias['pref_leguminosas'] = validar_numero("Quanto você gosta de FEIJÃO/LENTILHA/GRÃO-DE-BICO? ", 0, 10) / 10
+        preferencias['pref_integral'] = validar_numero("Prefere versões INTEGRAIS (arroz integral, pão integral)? ", 0, 10) / 10
+
+        # === VEGETAIS E FRUTAS ===
+        print("\n" + "-" * 80)
+        print("🥬 VEGETAIS E FRUTAS")
+        print("-" * 80)
+        preferencias['pref_vegetais_verdes'] = validar_numero("Quanto você gosta de VEGETAIS VERDES (brócolis, couve)? ", 0, 10) / 10
+        preferencias['pref_vegetais_raiz'] = validar_numero("Quanto você gosta de VEGETAIS DE RAIZ (cenoura, beterraba)? ", 0, 10) / 10
+        preferencias['pref_frutas_doces'] = validar_numero("Quanto você gosta de FRUTAS DOCES (banana, mamão, uva)? ", 0, 10) / 10
+        preferencias['pref_frutas_citricas'] = validar_numero("Quanto você gosta de FRUTAS CÍTRICAS (laranja, tangerina)? ", 0, 10) / 10
+
+        # === GORDURAS E OLEAGINOSAS ===
+        print("\n" + "-" * 80)
+        print("🥑 GORDURAS SAUDÁVEIS")
+        print("-" * 80)
+        preferencias['pref_abacate'] = validar_numero("Quanto você gosta de ABACATE? ", 0, 10) / 10
+        preferencias['pref_oleaginosas'] = validar_numero("Quanto você gosta de CASTANHAS/NOZES/AMENDOIM? ", 0, 10) / 10
+        preferencias['pref_azeite'] = validar_numero("Prefere AZEITE DE OLIVA a outros óleos? ", 0, 10) / 10
+
+        # === INDUSTRIALIZADOS ===
+        print("\n" + "-" * 80)
+        print("🍕 ALIMENTOS INDUSTRIALIZADOS/PRÁTICOS")
+        print("-" * 80)
+        preferencias['aceita_industrializados'] = validar_numero("Você aceita INDUSTRIALIZADOS (mortadela, presunto, nuggets)? ", 0, 10) / 10
+        preferencias['aceita_embutidos'] = validar_numero("Você aceita EMBUTIDOS (linguiça, salsicha)? ", 0, 10) / 10
+
+        # === RESTRIÇÕES GERAIS ===
+        print("\n" + "-" * 80)
+        print("⚙️  PREFERÊNCIAS GERAIS")
+        print("-" * 80)
         preferencias['evita_sodio'] = validar_numero("Você EVITA alimentos com alto SÓDIO? ", 0, 10) / 10
-        preferencias['pref_custo_baixo'] = validar_numero("Prefere alimentos mais BARATOS? ", 0, 10) / 10
+        preferencias['pref_custo_baixo'] = validar_numero("Prefere alimentos mais ECONÔMICOS? ", 0, 10) / 10
 
         print("\n✅ Preferências coletadas com sucesso!\n")
         return preferencias
@@ -61,7 +102,8 @@ class SistemaPreferenciasRNA:
         n_total = n_samples * n_alimentos
         
         # Pré-aloca arrays para melhor performance
-        n_features = 8 + len(preferencias)  # 8 features do alimento + preferências
+        # Features: 8 nutricionais + nome do alimento (one-hot seria ideal, mas simplificamos)
+        n_features = 8 + len(preferencias)
         X_treino = np.zeros((n_total, n_features), dtype=np.float32)
         y_treino = np.zeros(n_total, dtype=np.float32)
         
@@ -93,59 +135,133 @@ class SistemaPreferenciasRNA:
             
             # Calcula notas de preferência (vetorizado)
             y_treino[idx_base:idx_fim] = self._calcular_notas_vetorizado(
-                features_alimentos, pref_variadas[i], preferencias
+                df_alimentos, features_alimentos, pref_variadas[i], preferencias
             )
             
             idx_base = idx_fim
         
         return X_treino, y_treino
 
-    def _calcular_notas_vetorizado(self, features_alimentos: np.ndarray, 
+    def _calcular_notas_vetorizado(self, df_alimentos: pd.DataFrame,
+                                   features_alimentos: np.ndarray, 
                                    pref: np.ndarray, pref_dict: Dict) -> np.ndarray:
         """
         Versão VETORIZADA do cálculo de notas de preferência.
-        Processa todos os alimentos de uma vez.
+        Usa CATEGORIAS ESPECÍFICAS de alimentos ao invés de macronutrientes genéricos.
         """
         n_alimentos = len(features_alimentos)
         notas = np.full(n_alimentos, 0.5, dtype=np.float32)  # baseline
         
-        # Extrai colunas (evita múltiplos acessos)
-        proteinas = features_alimentos[:, 0]
-        carboidratos = features_alimentos[:, 1]
-        gorduras = features_alimentos[:, 2]
-        fibras = features_alimentos[:, 3]
-        calorias = features_alimentos[:, 4]
+        # Extrai colunas nutricionais
         sodio = features_alimentos[:, 5]
         custo = features_alimentos[:, 6]
         saude = features_alimentos[:, 7]
         
-        # Mapeia preferências
-        pref_proteina = pref[0]
-        pref_carboidrato = pref[1]
-        pref_gordura = pref[2]
-        pref_fibras = pref[3]
-        pref_baixa_cal = pref[4]
-        evita_sodio = pref[5]
-        pref_custo = pref[6]
+        # Mapeia as novas preferências
+        pref_keys = list(pref_dict.keys())
+        pref_frango = pref[pref_keys.index('pref_frango')]
+        pref_carne_vermelha = pref[pref_keys.index('pref_carne_vermelha')]
+        pref_peixe = pref[pref_keys.index('pref_peixe')]
+        pref_ovos = pref[pref_keys.index('pref_ovos')]
+        pref_laticinio = pref[pref_keys.index('pref_laticinio')]
+        pref_arroz = pref[pref_keys.index('pref_arroz')]
+        pref_massa = pref[pref_keys.index('pref_massa')]
+        pref_paes = pref[pref_keys.index('pref_paes')]
+        pref_batata = pref[pref_keys.index('pref_batata')]
+        pref_leguminosas = pref[pref_keys.index('pref_leguminosas')]
+        pref_integral = pref[pref_keys.index('pref_integral')]
+        pref_vegetais_verdes = pref[pref_keys.index('pref_vegetais_verdes')]
+        pref_vegetais_raiz = pref[pref_keys.index('pref_vegetais_raiz')]
+        pref_frutas_doces = pref[pref_keys.index('pref_frutas_doces')]
+        pref_frutas_citricas = pref[pref_keys.index('pref_frutas_citricas')]
+        pref_abacate = pref[pref_keys.index('pref_abacate')]
+        pref_oleaginosas = pref[pref_keys.index('pref_oleaginosas')]
+        pref_azeite = pref[pref_keys.index('pref_azeite')]
+        aceita_industrializados = pref[pref_keys.index('aceita_industrializados')]
+        aceita_embutidos = pref[pref_keys.index('aceita_embutidos')]
+        evita_sodio = pref[pref_keys.index('evita_sodio')]
+        pref_custo_baixo = pref[pref_keys.index('pref_custo_baixo')]
         
-        # Pontuação por macronutrientes (vetorizado)
-        notas += np.where(proteinas > 15, pref_proteina * 0.2, 0)
-        notas += np.where(carboidratos > 30, pref_carboidrato * 0.2, 0)
-        notas += np.where(gorduras > 10, pref_gordura * 0.15, 0)
-        notas += np.where(fibras > 5, pref_fibras * 0.15, 0)
+        # Itera sobre alimentos e aplica preferências específicas
+        for i, row in df_alimentos.iterrows():
+            nome = row['nome'].lower()
+            bonus = 0.0
+            
+            # === PROTEÍNAS ANIMAIS ===
+            if 'frango' in nome:
+                bonus += pref_frango * 0.4
+            elif any(x in nome for x in ['bife', 'picanha', 'alcatra', 'carne', 'coxão', 'patinho', 'acém']):
+                bonus += pref_carne_vermelha * 0.4
+            elif 'porco' in nome or 'lombo' in nome or 'pernil' in nome:
+                bonus += pref_carne_vermelha * 0.35  # Um pouco menos que boi
+            elif any(x in nome for x in ['salmão', 'tilápia', 'sardinha', 'atum', 'peixe']):
+                bonus += pref_peixe * 0.4
+            elif 'ovo' in nome:
+                bonus += pref_ovos * 0.4
+            elif any(x in nome for x in ['queijo', 'leite', 'iogurte', 'requeijão']):
+                bonus += pref_laticinio * 0.4
+            
+            # === EMBUTIDOS (penalização se não aceita) ===
+            if any(x in nome for x in ['linguiça', 'bacon', 'carne seca']):
+                bonus += aceita_embutidos * 0.3 - (1 - aceita_embutidos) * 0.3
+            if any(x in nome for x in ['mortadela', 'presunto', 'salsicha']):
+                bonus += aceita_industrializados * 0.3 - (1 - aceita_industrializados) * 0.3
+            
+            # === CARBOIDRATOS ===
+            if 'arroz' in nome:
+                if 'integral' in nome:
+                    bonus += (pref_arroz * 0.4 + pref_integral * 0.2) / 2
+                else:
+                    bonus += pref_arroz * 0.4 - pref_integral * 0.1  # Penaliza se prefere integral
+            elif any(x in nome for x in ['macarrão', 'massa']):
+                bonus += pref_massa * 0.4
+            elif 'pão' in nome:
+                if 'integral' in nome or 'centeio' in nome:
+                    bonus += (pref_paes * 0.4 + pref_integral * 0.2) / 2
+                else:
+                    bonus += pref_paes * 0.4 - pref_integral * 0.1
+            elif any(x in nome for x in ['batata', 'mandioca', 'inhame', 'cará']):
+                bonus += pref_batata * 0.4
+            elif any(x in nome for x in ['feijão', 'lentilha', 'grão-de-bico', 'ervilha', 'soja']):
+                bonus += pref_leguminosas * 0.4
+            elif 'aveia' in nome or 'integral' in nome:
+                bonus += pref_integral * 0.3
+            
+            # === VEGETAIS ===
+            if any(x in nome for x in ['brócolis', 'couve', 'alface', 'repolho', 'vagem']):
+                bonus += pref_vegetais_verdes * 0.35
+            elif any(x in nome for x in ['cenoura', 'beterraba', 'abobrinha']):
+                bonus += pref_vegetais_raiz * 0.35
+            
+            # === FRUTAS ===
+            if any(x in nome for x in ['banana', 'mamão', 'uva', 'melancia', 'abacaxi']):
+                bonus += pref_frutas_doces * 0.35
+            elif any(x in nome for x in ['laranja', 'tangerina', 'limão']):
+                bonus += pref_frutas_citricas * 0.35
+            elif 'abacate' in nome:
+                bonus += pref_abacate * 0.4
+            
+            # === OLEAGINOSAS E GORDURAS ===
+            if any(x in nome for x in ['amendoim', 'castanha', 'nozes', 'amêndoas']):
+                bonus += pref_oleaginosas * 0.4
+            elif 'azeite' in nome:
+                bonus += pref_azeite * 0.3
+            
+            # === INDUSTRIALIZADOS GERAIS ===
+            if row['tipo'] == 'industrializado':
+                bonus += aceita_industrializados * 0.2 - (1 - aceita_industrializados) * 0.2
+            
+            notas[i] += bonus
         
-        # Bonificação/penalização por calorias
-        notas += np.where(calorias < 200, pref_baixa_cal * 0.1, 0)
-        notas -= np.where(calorias > 400, pref_baixa_cal * 0.1, 0)
+        # Penalização por sódio alto (vetorizado)
+        notas -= np.where(sodio > 500, evita_sodio * 0.2, 0)
         
-        # Penalização por sódio alto
-        notas -= np.where(sodio > 500, evita_sodio * 0.15, 0)
+        # Bonificação por custo baixo (vetorizado)
+        notas += np.where(custo < 5, pref_custo_baixo * 0.15, 0)
+        notas -= np.where(custo > 10, pref_custo_baixo * 0.1, 0)
         
-        # Bonificação por custo baixo
-        notas += np.where(custo < 5, pref_custo * 0.1, 0)
-        
-        # Usa nota de saúde fuzzy
-        notas += (saude / 100) * 0.2
+        # Usa nota de saúde fuzzy (peso menor agora)
+        notas += (saude / 100) * 0.1
         
         # Adiciona ruído
         notas += np.random.normal(0, 0.05, n_alimentos).astype(np.float32)
