@@ -9,8 +9,6 @@
 [![Genetic Algorithm](https://img.shields.io/badge/AI-Genetic%20Algorithm-red.svg)]()
 [![A* Search](https://img.shields.io/badge/AI-A*%20Search-yellow.svg)]()
 
----
-
 ## 📖 Sobre o Projeto
 
 O **AI-HealthyDietPlanner** é um sistema avançado de geração automática de cardápios alimentares que combina **4 técnicas de Inteligência Artificial** para criar planos nutricionais personalizados, saudáveis e realistas, respeitando a culinária brasileira.
@@ -31,8 +29,6 @@ Desenvolvido como Trabalho Final da disciplina de **Inteligência Artificial** n
 
 5. **Saúde acessível**: Considera orçamento e custo dos alimentos, tornando alimentação saudável mais democrática.
 
----
-
 ## 🧠 Arquitetura e Técnicas de IA
 
 O sistema utiliza **4 módulos de IA integrados** em um pipeline sequencial:
@@ -49,12 +45,10 @@ Arquivo: algoritmos/fuzzy_saudavel.py
 **Como funciona**:
 
 - Define funções de pertinência fuzzy para nutrientes (proteínas: baixa/média/alta, sódio: baixo/médio/alto, etc.)
-- Aplica **9 regras fuzzy** especializadas (ex: "SE proteína alta E sódio baixo ENTÃO saudável BOM")
+- Aplica **9 regras fuzzy**
 - Considera contexto brasileiro (penaliza ultraprocessados, favorece feijão, ovo, peixe)
 
 **Output**: Score de saúde (0-10) para cada alimento
-
----
 
 ### 2️⃣ **Rede Neural Artificial** - Aprendizado de Preferências
 
@@ -74,8 +68,6 @@ Arquivo: algoritmos/rna_preferencias.py
 
 **Output**: Score de preferência personalizado para cada alimento
 
----
-
 ### 3️⃣ **Busca A\* (A-Star)** - Pré-Seleção Inteligente
 
 ```python
@@ -93,8 +85,6 @@ Arquivo: algoritmos/busca_a_star.py
 - Retorna **top 15-20 alimentos** de cada tipo nutricional
 
 **Output**: Conjunto reduzido e otimizado de candidatos → acelera AG
-
----
 
 ### 4️⃣ **Algoritmo Genético** - Otimização de Cardápios
 
@@ -118,8 +108,6 @@ Arquivo: algoritmos/algoritmo_genetico.py
 - **Elitismo**: Mantém 10 melhores a cada geração
 
 **Output**: Cardápio otimizado do dia inteiro
-
----
 
 ## 🌟 Funcionalidades Principais
 
@@ -164,8 +152,6 @@ Castanhas: 15-40g (1 punhado)
 5. High-Protein (25/45/30)
 6. Zona (40/30/30)
 
----
-
 ## 📊 Base de Dados
 
 **96 alimentos brasileiros** com informações completas:
@@ -179,8 +165,6 @@ Castanhas: 15-40g (1 punhado)
 | **Gorduras**     | Azeite, Oleaginosas, Manteiga        | 10 alimentos |
 
 **Dados por 100g**: calorias, proteínas, carboidratos, gorduras (saturadas/insaturadas), fibras, sódio, custo estimado.
-
----
 
 ## 🚀 Instalação e Uso
 
@@ -260,8 +244,6 @@ O sistema salvará automaticamente:
 - **`cardapio_personalizado_YYYYMMDD_HHMMSS.txt`**: Cardápio formatado para impressão
 - **`cardapio_dataframe_YYYYMMDD_HHMMSS.csv`**: Dados em formato tabular (Excel/análise)
 
----
-
 ## 📁 Estrutura do Projeto
 
 ```
@@ -286,13 +268,8 @@ AI-HealthyDietPlanner/
 │
 ├── requirements.txt                 # Dependências Python
 ├── README.md                        # Este arquivo
-├── EXCLUSAO_MUTUA.md               # Documentação do sistema de exclusão
-├── teste_exclusao_mutua.py         # Script de teste
-├── verificar_consistencia.py       # Validação de dados
 └── LICENSE                          # Licença MIT
 ```
-
----
 
 ## 🎨 Exemplo de Saída
 
@@ -334,91 +311,6 @@ Preferência: 8.5/10 ✅
 ════════════════════════════════════════════════════════════════════════════════
 ```
 
----
-
-## 🔧 Recursos Avançados
-
-### 1. Verificação de Consistência
-
-Valida que todos os alimentos nas regras existem na base de dados:
-
-```bash
-python verificar_consistencia.py
-```
-
-### 2. Teste do Sistema de Exclusão Mútua
-
-Demonstra como funciona o bloqueio de alimentos similares:
-
-```bash
-python teste_exclusao_mutua.py
-```
-
-### 3. Personalização de Regras
-
-Edite `data/regras_culinarias.py` para:
-
-- Adicionar novos alimentos
-- Modificar compatibilidades (ex: permitir peixe com feijão)
-- Ajustar limites de gramatura
-- Criar novas categorias culinárias
-
-### 4. Expansão da Base de Dados
-
-Adicione alimentos em `data/dados_alimentos.py`:
-
-```python
-{"nome": "Novo Alimento",
- "calorias": 120,
- "proteinas": 10.0,
- "gorduras": 5.0,
- "gordura_saturada": 1.0,
- "carboidratos": 15.0,
- "fibras": 3.0,
- "sodio": 50,
- "custo": 2.0,
- "tipo": "proteina"}  # ou carboidrato, vegetal, fruta, gordura
-```
-
-Depois categorize em `regras_culinarias.py`:
-
-```python
-CATEGORIAS_CULINARIAS = {
-    'Novo Alimento': 'prato_principal',  # ou frios, salada, etc.
-}
-```
-
----
-
-## 📚 Documentação Adicional
-
-- **[EXCLUSAO_MUTUA.md](EXCLUSAO_MUTUA.md)**: Sistema de exclusão de alimentos similares
-- **Comentários no código**: Todos os módulos possuem docstrings detalhadas
-- **Type hints**: Código Python totalmente tipado para melhor compreensão
-
----
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/NovaFuncionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
-5. Abra um Pull Request
-
-**Ideias para contribuir**:
-
-- Adicionar mais alimentos brasileiros
-- Implementar restrições alimentares (vegetariano, vegano, sem lactose, sem glúten)
-- Criar interface gráfica (Streamlit, Flask)
-- Adicionar exportação para PDF
-- Implementar sistema de histórico/acompanhamento
-- Suportar planejamento semanal
-
----
-
 ## 🏆 Autores
 
 Desenvolvido como **Trabalho Final** da disciplina de Inteligência Artificial.
@@ -434,44 +326,12 @@ Desenvolvido como **Trabalho Final** da disciplina de Inteligência Artificial.
 
 **Instituição**: Universidade do Vale do Rio dos Sinos (Unisinos)
 
----
-
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
----
-
-## 🙏 Agradecimentos
-
-- **Prof. Marcos Sulzbach Morgenstern** - Pela orientação e conhecimento compartilhado
-- **Comunidade Python** - Pelas excelentes bibliotecas de IA
-- **TACO (Tabela Brasileira de Composição de Alimentos)** - Base nutricional
-- **Unisinos** - Infraestrutura e suporte acadêmico
-
----
-
-## 📞 Contato
-
-Para dúvidas, sugestões ou colaborações:
-
-- **GitHub Issues**: [Abrir issue](https://github.com/frosipedro/AI-HealthyDietPlanner/issues)
-- **Email**: [contato através do GitHub]
-
----
-
-## 🌟 Mensagem Final
-
-Agradecimento especial a todos que acreditam que **tecnologia pode melhorar a qualidade de vida** das pessoas através de soluções práticas, acessíveis e inteligentes.
-
-**Coma bem. Viva melhor. Com inteligência.** 🍽️🧠
-
----
-
 <div align="center">
 
 **[⬆ Voltar ao topo](#-ai-healthydietplanner)**
-
-Made with ❤️ and 🧠 by Cristian, Marco, Pedro & William
 
 </div>
