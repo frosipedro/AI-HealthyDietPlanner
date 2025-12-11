@@ -1,9 +1,51 @@
+"""Sistema de Preferências usando Rede Neural Artificial"""
+
 import numpy as np
 import pandas as pd
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
-from typing import Dict
+from typing import Dict, List, Tuple
 from utils.validacao_input import validar_numero
+
+
+# ============================================================================
+# MAPEAMENTO DE CATEGORIAS DE ALIMENTOS (para detecção eficiente)
+# ============================================================================
+
+CATEGORIAS_ALIMENTOS = {
+    'frango': ['frango'],
+    'carne_vermelha': ['bife', 'picanha', 'alcatra', 'carne', 'coxão', 'patinho', 'acém'],
+    'carne_porco': ['porco', 'lombo', 'pernil'],
+    'peixe': ['salmão', 'tilápia', 'sardinha', 'atum', 'peixe', 'camarão', 'bacalhau'],
+    'ovos': ['ovo'],
+    'laticinio': ['queijo', 'leite', 'iogurte', 'requeijão'],
+    'embutidos': ['linguiça', 'bacon', 'carne seca'],
+    'industrializados': ['mortadela', 'presunto', 'salsicha', 'nugget'],
+    'arroz': ['arroz'],
+    'massa': ['macarrão', 'massa'],
+    'pao': ['pão'],
+    'batata': ['batata', 'mandioca', 'inhame', 'cará'],
+    'leguminosas': ['feijão', 'lentilha', 'grão-de-bico', 'ervilha', 'soja'],
+    'integral': ['integral', 'aveia', 'centeio'],
+    'vegetais_verdes': ['brócolis', 'couve', 'alface', 'repolho', 'vagem'],
+    'vegetais_raiz': ['cenoura', 'beterraba', 'abobrinha'],
+    'frutas_doces': ['banana', 'mamão', 'uva', 'melancia', 'abacaxi'],
+    'frutas_citricas': ['laranja', 'tangerina', 'limão'],
+    'abacate': ['abacate'],
+    'oleaginosas': ['amendoim', 'castanha', 'nozes', 'amêndoas'],
+    'azeite': ['azeite']
+}
+
+
+def categorizar_alimento(nome: str) -> Dict[str, bool]:
+    """Retorna dict com flags booleanas indicando categorias do alimento."""
+    nome_lower = nome.lower()
+    categorias = {}
+    
+    for categoria, palavras_chave in CATEGORIAS_ALIMENTOS.items():
+        categorias[categoria] = any(palavra in nome_lower for palavra in palavras_chave)
+    
+    return categorias
 
 # ============================================================================
 # 1. REDE NEURAL ARTIFICIAL - SISTEMA DE PREFERÊNCIAS
@@ -146,124 +188,100 @@ class SistemaPreferenciasRNA:
                                    features_alimentos: np.ndarray, 
                                    pref: np.ndarray, pref_dict: Dict) -> np.ndarray:
         """
-        Versão VETORIZADA do cálculo de notas de preferência.
-        Usa CATEGORIAS ESPECÍFICAS de alimentos ao invés de macronutrientes genéricos.
+        Versão REALMENTE VETORIZADA do cálculo de notas de preferência.
+        Usa operações vetorizadas do NumPy/Pandas para máxima performance.
         """
         n_alimentos = len(features_alimentos)
         notas = np.full(n_alimentos, 0.5, dtype=np.float32)  # baseline
         
-        # Extrai colunas nutricionais
+        # Extrai colunas nutricionais (vetorizado)
         sodio = features_alimentos[:, 5]
         custo = features_alimentos[:, 6]
         saude = features_alimentos[:, 7]
         
-        # Mapeia as novas preferências
+        # Extrai preferências do array
         pref_keys = list(pref_dict.keys())
-        pref_frango = pref[pref_keys.index('pref_frango')]
-        pref_carne_vermelha = pref[pref_keys.index('pref_carne_vermelha')]
-        pref_peixe = pref[pref_keys.index('pref_peixe')]
-        pref_ovos = pref[pref_keys.index('pref_ovos')]
-        pref_laticinio = pref[pref_keys.index('pref_laticinio')]
-        pref_arroz = pref[pref_keys.index('pref_arroz')]
-        pref_massa = pref[pref_keys.index('pref_massa')]
-        pref_paes = pref[pref_keys.index('pref_paes')]
-        pref_batata = pref[pref_keys.index('pref_batata')]
-        pref_leguminosas = pref[pref_keys.index('pref_leguminosas')]
-        pref_integral = pref[pref_keys.index('pref_integral')]
-        pref_vegetais_verdes = pref[pref_keys.index('pref_vegetais_verdes')]
-        pref_vegetais_raiz = pref[pref_keys.index('pref_vegetais_raiz')]
-        pref_frutas_doces = pref[pref_keys.index('pref_frutas_doces')]
-        pref_frutas_citricas = pref[pref_keys.index('pref_frutas_citricas')]
-        pref_abacate = pref[pref_keys.index('pref_abacate')]
-        pref_oleaginosas = pref[pref_keys.index('pref_oleaginosas')]
-        pref_azeite = pref[pref_keys.index('pref_azeite')]
-        aceita_industrializados = pref[pref_keys.index('aceita_industrializados')]
-        aceita_embutidos = pref[pref_keys.index('aceita_embutidos')]
-        evita_sodio = pref[pref_keys.index('evita_sodio')]
-        pref_custo_baixo = pref[pref_keys.index('pref_custo_baixo')]
+        prefs = {key: pref[pref_keys.index(key)] for key in pref_keys}
         
-        # Itera sobre alimentos e aplica preferências específicas
-        for i, row in df_alimentos.iterrows():
-            nome = row['nome'].lower()
-            bonus = 0.0
-            
-            # === PROTEÍNAS ANIMAIS ===
-            if 'frango' in nome:
-                bonus += pref_frango * 0.4
-            elif any(x in nome for x in ['bife', 'picanha', 'alcatra', 'carne', 'coxão', 'patinho', 'acém']):
-                bonus += pref_carne_vermelha * 0.4
-            elif 'porco' in nome or 'lombo' in nome or 'pernil' in nome:
-                bonus += pref_carne_vermelha * 0.35  # Um pouco menos que boi
-            elif any(x in nome for x in ['salmão', 'tilápia', 'sardinha', 'atum', 'peixe']):
-                bonus += pref_peixe * 0.4
-            elif 'ovo' in nome:
-                bonus += pref_ovos * 0.4
-            elif any(x in nome for x in ['queijo', 'leite', 'iogurte', 'requeijão']):
-                bonus += pref_laticinio * 0.4
-            
-            # === EMBUTIDOS (penalização se não aceita) ===
-            if any(x in nome for x in ['linguiça', 'bacon', 'carne seca']):
-                bonus += aceita_embutidos * 0.3 - (1 - aceita_embutidos) * 0.3
-            if any(x in nome for x in ['mortadela', 'presunto', 'salsicha']):
-                bonus += aceita_industrializados * 0.3 - (1 - aceita_industrializados) * 0.3
-            
-            # === CARBOIDRATOS ===
-            if 'arroz' in nome:
-                if 'integral' in nome:
-                    bonus += (pref_arroz * 0.4 + pref_integral * 0.2) / 2
-                else:
-                    bonus += pref_arroz * 0.4 - pref_integral * 0.1  # Penaliza se prefere integral
-            elif any(x in nome for x in ['macarrão', 'massa']):
-                bonus += pref_massa * 0.4
-            elif 'pão' in nome:
-                if 'integral' in nome or 'centeio' in nome:
-                    bonus += (pref_paes * 0.4 + pref_integral * 0.2) / 2
-                else:
-                    bonus += pref_paes * 0.4 - pref_integral * 0.1
-            elif any(x in nome for x in ['batata', 'mandioca', 'inhame', 'cará']):
-                bonus += pref_batata * 0.4
-            elif any(x in nome for x in ['feijão', 'lentilha', 'grão-de-bico', 'ervilha', 'soja']):
-                bonus += pref_leguminosas * 0.4
-            elif 'aveia' in nome or 'integral' in nome:
-                bonus += pref_integral * 0.3
-            
-            # === VEGETAIS ===
-            if any(x in nome for x in ['brócolis', 'couve', 'alface', 'repolho', 'vagem']):
-                bonus += pref_vegetais_verdes * 0.35
-            elif any(x in nome for x in ['cenoura', 'beterraba', 'abobrinha']):
-                bonus += pref_vegetais_raiz * 0.35
-            
-            # === FRUTAS ===
-            if any(x in nome for x in ['banana', 'mamão', 'uva', 'melancia', 'abacaxi']):
-                bonus += pref_frutas_doces * 0.35
-            elif any(x in nome for x in ['laranja', 'tangerina', 'limão']):
-                bonus += pref_frutas_citricas * 0.35
-            elif 'abacate' in nome:
-                bonus += pref_abacate * 0.4
-            
-            # === OLEAGINOSAS E GORDURAS ===
-            if any(x in nome for x in ['amendoim', 'castanha', 'nozes', 'amêndoas']):
-                bonus += pref_oleaginosas * 0.4
-            elif 'azeite' in nome:
-                bonus += pref_azeite * 0.3
-            
-            # === INDUSTRIALIZADOS GERAIS ===
-            if row['tipo'] == 'industrializado':
-                bonus += aceita_industrializados * 0.2 - (1 - aceita_industrializados) * 0.2
-            
-            notas[i] += bonus
+        # === CATEGORIZAÇÃO DE ALIMENTOS (UMA VEZ SÓ) ===
+        # Cria array de categorias para cada alimento
+        categorias_array = df_alimentos['nome'].apply(categorizar_alimento)
+        
+        # Converte para arrays booleanos (vetorizado)
+        mask_frango = np.array([cat['frango'] for cat in categorias_array])
+        mask_carne_vermelha = np.array([cat['carne_vermelha'] for cat in categorias_array])
+        mask_carne_porco = np.array([cat['carne_porco'] for cat in categorias_array])
+        mask_peixe = np.array([cat['peixe'] for cat in categorias_array])
+        mask_ovos = np.array([cat['ovos'] for cat in categorias_array])
+        mask_laticinio = np.array([cat['laticinio'] for cat in categorias_array])
+        mask_embutidos = np.array([cat['embutidos'] for cat in categorias_array])
+        mask_industrializados = np.array([cat['industrializados'] for cat in categorias_array])
+        mask_arroz = np.array([cat['arroz'] for cat in categorias_array])
+        mask_massa = np.array([cat['massa'] for cat in categorias_array])
+        mask_pao = np.array([cat['pao'] for cat in categorias_array])
+        mask_batata = np.array([cat['batata'] for cat in categorias_array])
+        mask_leguminosas = np.array([cat['leguminosas'] for cat in categorias_array])
+        mask_integral = np.array([cat['integral'] for cat in categorias_array])
+        mask_vegetais_verdes = np.array([cat['vegetais_verdes'] for cat in categorias_array])
+        mask_vegetais_raiz = np.array([cat['vegetais_raiz'] for cat in categorias_array])
+        mask_frutas_doces = np.array([cat['frutas_doces'] for cat in categorias_array])
+        mask_frutas_citricas = np.array([cat['frutas_citricas'] for cat in categorias_array])
+        mask_abacate = np.array([cat['abacate'] for cat in categorias_array])
+        mask_oleaginosas = np.array([cat['oleaginosas'] for cat in categorias_array])
+        mask_azeite = np.array([cat['azeite'] for cat in categorias_array])
+        
+        # === APLICAÇÃO DE BÔNUS/PENALIDADES (VETORIZADO) ===
+        
+        # Proteínas animais
+        notas += np.where(mask_frango, prefs['pref_frango'] * 0.4, 0.0)
+        notas += np.where(mask_carne_vermelha, prefs['pref_carne_vermelha'] * 0.4, 0.0)
+        notas += np.where(mask_carne_porco, prefs['pref_carne_vermelha'] * 0.35, 0.0)
+        notas += np.where(mask_peixe, prefs['pref_peixe'] * 0.4, 0.0)
+        notas += np.where(mask_ovos, prefs['pref_ovos'] * 0.4, 0.0)
+        notas += np.where(mask_laticinio, prefs['pref_laticinio'] * 0.4, 0.0)
+        
+        # Embutidos e industrializados (penaliza se não aceita)
+        aceita_emb = prefs['aceita_embutidos']
+        aceita_ind = prefs['aceita_industrializados']
+        notas += np.where(mask_embutidos, aceita_emb * 0.3 - (1 - aceita_emb) * 0.3, 0.0)
+        notas += np.where(mask_industrializados, aceita_ind * 0.3 - (1 - aceita_ind) * 0.3, 0.0)
+        
+        # Carboidratos (com lógica de integral)
+        pref_int = prefs['pref_integral']
+        notas += np.where(mask_arroz & mask_integral, (prefs['pref_arroz'] * 0.4 + pref_int * 0.2) / 2, 0.0)
+        notas += np.where(mask_arroz & ~mask_integral, prefs['pref_arroz'] * 0.4 - pref_int * 0.1, 0.0)
+        notas += np.where(mask_massa, prefs['pref_massa'] * 0.4, 0.0)
+        notas += np.where(mask_pao & mask_integral, (prefs['pref_paes'] * 0.4 + pref_int * 0.2) / 2, 0.0)
+        notas += np.where(mask_pao & ~mask_integral, prefs['pref_paes'] * 0.4 - pref_int * 0.1, 0.0)
+        notas += np.where(mask_batata, prefs['pref_batata'] * 0.4, 0.0)
+        notas += np.where(mask_leguminosas, prefs['pref_leguminosas'] * 0.4, 0.0)
+        notas += np.where(mask_integral & ~mask_arroz & ~mask_pao, pref_int * 0.3, 0.0)
+        
+        # Vegetais
+        notas += np.where(mask_vegetais_verdes, prefs['pref_vegetais_verdes'] * 0.35, 0.0)
+        notas += np.where(mask_vegetais_raiz, prefs['pref_vegetais_raiz'] * 0.35, 0.0)
+        
+        # Frutas
+        notas += np.where(mask_frutas_doces, prefs['pref_frutas_doces'] * 0.35, 0.0)
+        notas += np.where(mask_frutas_citricas, prefs['pref_frutas_citricas'] * 0.35, 0.0)
+        notas += np.where(mask_abacate, prefs['pref_abacate'] * 0.4, 0.0)
+        
+        # Oleaginosas e gorduras
+        notas += np.where(mask_oleaginosas, prefs['pref_oleaginosas'] * 0.4, 0.0)
+        notas += np.where(mask_azeite, prefs['pref_azeite'] * 0.3, 0.0)
         
         # Penalização por sódio alto (vetorizado)
-        notas -= np.where(sodio > 500, evita_sodio * 0.2, 0)
+        notas -= np.where(sodio > 500, prefs['evita_sodio'] * 0.2, 0.0)
         
-        # Bonificação por custo baixo (vetorizado)
-        notas += np.where(custo < 5, pref_custo_baixo * 0.15, 0)
-        notas -= np.where(custo > 10, pref_custo_baixo * 0.1, 0)
+        # Bonificação/penalização por custo (vetorizado)
+        pref_custo = prefs['pref_custo_baixo']
+        notas += np.where(custo < 5, pref_custo * 0.15, 0.0)
+        notas -= np.where(custo > 10, pref_custo * 0.1, 0.0)
         
-        # Usa nota de saúde fuzzy (peso menor agora)
+        # Usa nota de saúde fuzzy (peso menor)
         notas += (saude / 100) * 0.1
         
-        # Adiciona ruído
+        # Adiciona ruído para variabilidade
         notas += np.random.normal(0, 0.05, n_alimentos).astype(np.float32)
         
         return np.clip(notas, 0, 1)

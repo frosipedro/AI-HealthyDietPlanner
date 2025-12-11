@@ -1,27 +1,35 @@
 """
 Algoritmo Genético - Refeições Compostas com Controle de Macros e Regras Culinárias do Mundo Real
-VERSÃO 2.0 - Sistema de compatibilidade entre alimentos
 """
 
 import numpy as np 
 import pandas as pd 
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from data.regras_culinarias import (
     obter_categoria_culinaria,
     obter_regras_refeicao,
     obter_limites_gramatura,
     alimento_permitido_na_refeicao,
     validar_composicao_refeicao,
-    validar_compatibilidade_refeicao,
-    verificar_compatibilidade_proteina_acompanhamento,
-    obter_tipo_proteina,
-    obter_tipo_acompanhamento,
-    PROTEINAS_PEIXE,
-    ACOMPANHAMENTOS_LEGUMINOSAS,
-    GRAMATURA_REALISTA
+    validar_diversidade_cardapio,
+    verificar_compatibilidade_proteina_acompanhamento
 )
+from data.dados_alimentos import verificar_conflito_exclusao
 
+def extrair_valor_float(valor: Any, padrao: float = 0.0) -> float:
+    """Extrai um valor float de forma segura de Series ou valores escalares."""
+    try:
+        # Se for Series/numpy, extrai o valor escalar
+        if hasattr(valor, 'item'):
+            valor = valor.item()
+        
+        # Converte para float
+        if pd.notna(valor):
+            return float(valor)
+        return padrao
+    except (ValueError, TypeError, AttributeError):
+        return padrao
 
 # ============================================================================
 # CLASSES PRINCIPAIS
@@ -131,7 +139,7 @@ class AlgoritmoGenetico:
     def _gerar_refeicao_aleatoria(self, calorias_alvo: float, nome_ref: str) -> List[Dict]:
         """
         Gera uma refeição aleatória seguindo REGRAS CULINÁRIAS DO MUNDO REAL.
-        VERSÃO 2.0 - Valida compatibilidade entre proteínas e acompanhamentos.
+        Valida compatibilidade entre proteínas e acompanhamentos.
         """
         alimentos_ref = []
         calorias_atual = 0
@@ -160,7 +168,7 @@ class AlgoritmoGenetico:
             categoria_escolhida = random.choice(obrigatorio_um_de)
             categorias_obrigatorias.append(categoria_escolhida)
         
-        # NOVO: Aumenta número de opcionais se há poucas refeições no dia
+        # Aumenta número de opcionais se há poucas refeições no dia
         num_total_refeicoes = len(self.config_refeicoes)
         if num_total_refeicoes <= 4:
             num_opcionais = random.randint(1, min(4, len(categorias_opcionais)))
@@ -179,7 +187,7 @@ class AlgoritmoGenetico:
         calorias_por_componente = calorias_alvo / total_componentes
         
         # =====================================================================
-        # NOVO: Primeiro escolhe a proteína (se houver), depois filtra acompanhamentos
+        # Primeiro escolhe a proteína (se houver), depois filtra acompanhamentos
         # =====================================================================
         proteina_escolhida = None
         
@@ -199,8 +207,8 @@ class AlgoritmoGenetico:
                     categorias_adicionadas.append(categoria)
                     proteina_escolhida = alimento['nome']
             else:
-                # Para outras categorias, verifica compatibilidade com proteína
-                alimento = self._escolher_alimento_por_categoria_compativel(
+                # Para outras categorias, usa a função unificada com compatibilidade
+                alimento = self._escolher_alimento_por_categoria(
                     categoria, 
                     calorias_por_componente, 
                     nome_ref,
@@ -214,7 +222,7 @@ class AlgoritmoGenetico:
         # Adiciona componentes OPCIONAIS (com verificação de compatibilidade)
         categorias_op_escolhidas = random.sample(categorias_opcionais, min(num_opcionais, len(categorias_opcionais)))
         for categoria in categorias_op_escolhidas:
-            alimento = self._escolher_alimento_por_categoria_compativel(
+            alimento = self._escolher_alimento_por_categoria(
                 categoria,
                 calorias_por_componente,
                 nome_ref,
@@ -225,7 +233,7 @@ class AlgoritmoGenetico:
                 calorias_atual += alimento['calorias']
                 categorias_adicionadas.append(categoria)
         
-        # NOVO: FORÇA COMBINAÇÕES OBRIGATÓRIAS (ex: Aveia PRECISA de Leite/Iogurte)
+        # FORÇA COMBINAÇÕES OBRIGATÓRIAS (ex: Aveia PRECISA de Leite/Iogurte)
         combinacoes_obrigatorias = regras.get('combinacoes_obrigatorias', {})
         for categoria_que_exige, categorias_necessarias in combinacoes_obrigatorias.items():
             if categoria_que_exige in categorias_adicionadas:
@@ -235,7 +243,7 @@ class AlgoritmoGenetico:
                 if not tem_necessaria:
                     # FORÇA adicionar uma categoria necessária
                     categoria_faltante = random.choice(categorias_necessarias)
-                    alimento_faltante = self._escolher_alimento_por_categoria_compativel(
+                    alimento_faltante = self._escolher_alimento_por_categoria(
                         categoria_faltante,
                         calorias_por_componente * 0.5,  # Metade das calorias
                         nome_ref,
@@ -249,7 +257,7 @@ class AlgoritmoGenetico:
         if calorias_atual > 0 and abs(calorias_atual - calorias_alvo) > 50:
             fator_ajuste = calorias_alvo / calorias_atual
             
-            # NOVO: Permite ajuste maior se há poucas refeições
+            # Permite ajuste maior se há poucas refeições
             if num_total_refeicoes <= 4:
                 fator_ajuste = max(0.5, min(2.0, fator_ajuste))
             else:
@@ -269,17 +277,17 @@ class AlgoritmoGenetico:
                 
                 nova_gramas = max(limites['min'], min(limites_max_ajustado, nova_gramas))
                 
-                alimentos_ref[i] = self._escalar_alimento(alimento_base, nova_gramas, calorias_alvo)
+                alimentos_ref[i] = self._escalar_alimento(alimento_base, nova_gramas)
         
         return alimentos_ref
     
-    def _escolher_alimento_por_categoria_compativel(self, categoria_culinaria: str, 
-                                                     calorias_alvo: float, 
-                                                     nome_ref: str,
-                                                     proteina_escolhida: str | None = None) -> Dict | None:
+    def _escolher_alimento_por_categoria(self, categoria_culinaria: str, 
+                                         calorias_alvo: float, 
+                                         nome_ref: str,
+                                         proteina_escolhida: str | None = None) -> Dict | None:
         """
-        Escolhe um alimento compatível com a proteína já escolhida.
-        NOVO: Filtra acompanhamentos incompatíveis (ex: feijão com peixe).
+        Escolhe um alimento que pertença à categoria culinária especificada.
+        Função unificada com verificação de compatibilidade opcional.
         """
         # Filtra alimentos por categoria culinária
         candidatos = []
@@ -292,7 +300,7 @@ class AlgoritmoGenetico:
                 if cat_culinaria == categoria_culinaria:
                     # Verifica se é permitido nesta refeição
                     if alimento_permitido_na_refeicao(alimento_nome, nome_ref):
-                        # NOVO: Verifica compatibilidade com proteína escolhida
+                        # Se há proteína escolhida, verifica compatibilidade
                         if proteina_escolhida:
                             compativel, _ = verificar_compatibilidade_proteina_acompanhamento(
                                 proteina_escolhida, alimento_nome
@@ -300,58 +308,6 @@ class AlgoritmoGenetico:
                             if not compativel:
                                 continue  # Pula alimentos incompatíveis
                         
-                        candidatos.append(idx)
-        
-        if not candidatos:
-            # Fallback: usa função original sem filtro de compatibilidade
-            return self._escolher_alimento_por_categoria(categoria_culinaria, calorias_alvo, nome_ref)
-        
-        # Escolhe aleatoriamente
-        idx_escolhido = random.choice(candidatos)
-        alimento_base = self.df.loc[idx_escolhido]
-        
-        # Calcula gramatura baseada nas calorias-alvo e limites culinários
-        limites = obter_limites_gramatura(str(alimento_base['nome']))
-        
-        try:
-            calorias_value = float(alimento_base['calorias'])
-        except (ValueError, TypeError):
-            calorias_value = 100.0
-        
-        if calorias_value > 0:
-            gramas_ideal = (calorias_alvo * 100) / calorias_value
-            
-            # Ajusta para limites culinários realistas
-            num_total_refeicoes = len(self.config_refeicoes)
-            if num_total_refeicoes <= 4:
-                limites_max_ajustado = int(limites['max'] * 1.5)
-            else:
-                limites_max_ajustado = limites['max']
-            
-            gramas = max(limites['min'], min(limites_max_ajustado, gramas_ideal))
-        else:
-            gramas = limites['ideal']
-        
-        return self._escalar_alimento(alimento_base, gramas, calorias_alvo)
-    
-    def _escolher_alimento_por_categoria(self, categoria_culinaria: str, 
-                                         calorias_alvo: float, 
-                                         nome_ref: str) -> Dict | None:
-        """
-        Escolhe um alimento que pertença à categoria culinária especificada.
-        VERSÃO CORRIGIDA - Bug do return corrigido.
-        """
-        # Filtra alimentos por categoria culinária
-        candidatos = []
-        
-        for tipo_nutri, indices in self.alimentos_pre.items():
-            for idx in indices:
-                alimento_nome = str(self.df.loc[idx, 'nome'])
-                cat_culinaria = obter_categoria_culinaria(alimento_nome)
-                
-                if cat_culinaria == categoria_culinaria:
-                    # Verifica se é permitido nesta refeição
-                    if alimento_permitido_na_refeicao(alimento_nome, nome_ref):
                         candidatos.append(idx)
         
         if not candidatos:
@@ -364,25 +320,20 @@ class AlgoritmoGenetico:
         # Calcula gramatura baseada nas calorias-alvo e limites culinários
         limites = obter_limites_gramatura(str(alimento_base['nome']))
         
-        try:
-            calorias_value = float(alimento_base['calorias'])
-        except (ValueError, TypeError):
-            calorias_value = 0.0
+        calorias_value = float(alimento_base['calorias'].item() if hasattr(alimento_base['calorias'], 'item') else alimento_base['calorias']) if alimento_base['calorias'] > 0 else 100.0
         
         if calorias_value > 0:
             gramas_calculada = (calorias_alvo / calorias_value) * 100
             
+            # Ajusta limites baseado no número de refeições
             num_total_refeicoes = len(self.config_refeicoes)
-            if num_total_refeicoes <= 4:
-                limites_max_ajustado = int(limites['max'] * 1.5)
-            else:
-                limites_max_ajustado = limites['max']
+            limites_max_ajustado = int(limites['max'] * 1.5) if num_total_refeicoes <= 4 else limites['max']
             
             gramas = max(limites['min'], min(limites_max_ajustado, gramas_calculada))
         else:
             gramas = limites['ideal']
         
-        return self._escalar_alimento(alimento_base, gramas, calorias_alvo)
+        return self._escalar_alimento(alimento_base, gramas)
     
     def _gerar_refeicao_generica(self, calorias_alvo: float, nome_ref: str, regras: dict) -> List[Dict]:
         """Fallback: gera refeição genérica quando não há estrutura definida."""
@@ -426,17 +377,20 @@ class AlgoritmoGenetico:
             idx = random.choice(candidatos)
             alimento_base = self.df.loc[idx]
             
+            if isinstance(alimento_base, pd.DataFrame):
+                alimento_base = alimento_base.iloc[0]  # Pega primeira linha se for DataFrame
+
             limites = obter_limites_gramatura(str(alimento_base['nome']))
             
             try:
-                calorias_value = float(alimento_base['calorias'])
-            except (ValueError, TypeError):
+                calorias_value = extrair_valor_float(alimento_base['calorias'], 0.0)
+            except (ValueError, TypeError, AttributeError):
                 calorias_value = 0.0
             
             if calorias_value > 0:
                 gramas_calculada = (cal_por_item / calorias_value) * 100
                 
-                num_total_refeicoes = len(self.config_refeicoes)
+                # Usa num_total_refeicoes já calculado no início da função
                 if num_total_refeicoes <= 4:
                     limites_max_ajustado = int(limites['max'] * 1.5)
                 else:
@@ -446,11 +400,11 @@ class AlgoritmoGenetico:
             else:
                 gramas = limites['ideal']
             
-            alimentos_ref.append(self._escalar_alimento(alimento_base, gramas, calorias_alvo))
+            alimentos_ref.append(self._escalar_alimento(alimento_base, gramas))
         
         return alimentos_ref
     
-    def _escalar_alimento(self, alimento: pd.Series, gramas: float, calorias_alvo_refeicao: float = 600) -> Dict:
+    def _escalar_alimento(self, alimento: pd.Series, gramas: float) -> Dict:
         """
         Escala nutrientes proporcionalmente.
         Usa limites culinários realistas do mundo real.
@@ -482,35 +436,35 @@ class AlgoritmoGenetico:
         """
         totais = cardapio.calcular_totais()
         
-        # 1. Calorias (15%)
+        # 1. Calorias
         desvio_cal = abs(totais['calorias'] - self.metas['meta_calorias'])
         fitness_cal = max(0, 1 - (desvio_cal / self.metas['meta_calorias']))
         
-        # 2. Proteínas (15%)
+        # 2. Proteínas
         desvio_prot = abs(totais['proteinas'] - self.metas['gramas_prot'])
         fitness_prot = max(0, 1 - (desvio_prot / self.metas['gramas_prot']))
         
-        # 3. Carboidratos (15%)
+        # 3. Carboidratos
         desvio_carbo = abs(totais['carboidratos'] - self.metas['gramas_carbo'])
         fitness_carbo = max(0, 1 - (desvio_carbo / self.metas['gramas_carbo']))
         
-        # 4. Gorduras (10%)
+        # 4. Gorduras
         desvio_gord = abs(totais['gorduras'] - self.metas['gramas_gord'])
         fitness_gord = max(0, 1 - (desvio_gord / self.metas['gramas_gord']))
         
-        # 5. Saúde (8%)
+        # 5. Saúde
         fitness_saude = totais['saude_media'] / 10
         
-        # 6. Preferência (10%)
+        # 6. Preferência
         fitness_pref = totais['preferencia_media']
         
-        # 7. Custo (5%)
+        # 7. Custo
         if totais['custo'] <= self.metas['orcamento']:
             fitness_custo = 1.0 - (totais['custo'] / self.metas['orcamento']) * 0.3
         else:
             fitness_custo = -0.5
         
-        # 8. VALIDAÇÃO CULINÁRIA (22% do fitness) - PESO AUMENTADO!
+        # 8. VALIDAÇÃO CULINÁRIA 
         fitness_culinario = 0.0
         num_refeicoes = len(cardapio.refeicoes)
         
@@ -525,16 +479,36 @@ class AlgoritmoGenetico:
         
         fitness_culinario /= num_refeicoes
         
-        # Fitness total
+        # 9. DIVERSIDADE DE ALIMENTOS - Evita repetições no dia
+        cardapio_para_validacao = {
+            nome_ref: [{'nome': a['nome'], 'gramas': a['gramas']} for a in alimentos_ref]
+            for nome_ref, alimentos_ref in cardapio.refeicoes.items()
+        }
+        fitness_diversidade, _ = validar_diversidade_cardapio(cardapio_para_validacao)
+        
+        # 10. EXCLUSÃO MÚTUA - Penaliza alimentos similares no mesmo dia
+        fitness_exclusao = 1.0
+        todos_alimentos_dia = []
+        for alimentos_ref in cardapio.refeicoes.values():
+            for alimento in alimentos_ref:
+                todos_alimentos_dia.append(alimento['nome'])
+        
+        # Verifica se há conflito (ex: Feijão Preto E Feijão Carioca no mesmo dia)
+        if verificar_conflito_exclusao(todos_alimentos_dia):
+            fitness_exclusao = 0.0  # Penalização forte
+        
+        # Fitness total (soma = 100%)
         fitness = (
-            0.15 * fitness_cal +
-            0.15 * fitness_prot +
-            0.15 * fitness_carbo +
-            0.10 * fitness_gord +
-            0.08 * fitness_saude +
-            0.10 * fitness_pref +
-            0.05 * fitness_custo +
-            0.22 * fitness_culinario  # AUMENTADO DE 13% PARA 22%
+            0.14 * fitness_cal +          
+            0.14 * fitness_prot +         
+            0.11 * fitness_carbo +        
+            0.07 * fitness_gord +         
+            0.08 * fitness_saude +        
+            0.10 * fitness_pref +         
+            0.05 * fitness_custo +        
+            0.16 * fitness_culinario +    
+            0.10 * fitness_diversidade +  
+            0.05 * fitness_exclusao       # Nova penalização
         )
         
         cardapio.fitness = fitness
@@ -547,6 +521,8 @@ class AlgoritmoGenetico:
             'fitness_pref': fitness_pref,
             'fitness_custo': fitness_custo,
             'fitness_culinario': fitness_culinario,
+            'fitness_diversidade': fitness_diversidade,
+            'fitness_exclusao': fitness_exclusao,
             **totais
         }
         
@@ -561,11 +537,12 @@ class AlgoritmoGenetico:
         
         for i, (nome_ref, _) in enumerate(self.config_refeicoes):
             if i < ponto:
-                refeicoes_filho1[nome_ref] = pai1.refeicoes[nome_ref].copy()
-                refeicoes_filho2[nome_ref] = pai2.refeicoes[nome_ref].copy()
+                # Deep copy para evitar referências compartilhadas
+                refeicoes_filho1[nome_ref] = [alimento.copy() for alimento in pai1.refeicoes[nome_ref]]
+                refeicoes_filho2[nome_ref] = [alimento.copy() for alimento in pai2.refeicoes[nome_ref]]
             else:
-                refeicoes_filho1[nome_ref] = pai2.refeicoes[nome_ref].copy()
-                refeicoes_filho2[nome_ref] = pai1.refeicoes[nome_ref].copy()
+                refeicoes_filho1[nome_ref] = [alimento.copy() for alimento in pai2.refeicoes[nome_ref]]
+                refeicoes_filho2[nome_ref] = [alimento.copy() for alimento in pai1.refeicoes[nome_ref]]
         
         return CardapioCompleto(refeicoes_filho1), CardapioCompleto(refeicoes_filho2)
     
@@ -602,7 +579,7 @@ class AlgoritmoGenetico:
                             gramas = alimento_atual['gramas']
                             
                             cardapio.refeicoes[nome_ref][idx_mut] = self._escalar_alimento(
-                                novo_alimento, gramas, calorias_alvo_ref
+                                novo_alimento, gramas
                             )
                 else:
                     # Ajusta gramatura RESPEITANDO LIMITES CULINÁRIOS
@@ -618,7 +595,7 @@ class AlgoritmoGenetico:
                         
                         alimento_base = self.df.loc[alimento['idx']]
                         cardapio.refeicoes[nome_ref][idx_mut] = self._escalar_alimento(
-                            alimento_base, nova_gramas, calorias_alvo_ref
+                            alimento_base, nova_gramas
                         )
     
     def evoluir(self, tamanho_pop: int = 150, num_ger: int = 100) -> CardapioCompleto:
@@ -645,6 +622,7 @@ class AlgoritmoGenetico:
                 print(f"Geração {gen:3d} | Fitness: {melhor.fitness:.4f} | "
                       f"Calorias: {melhor.metricas['calorias']:.0f} | "
                       f"Culinário: {melhor.metricas['fitness_culinario']:.2f} | "
+                      f"Diversidade: {melhor.metricas['fitness_diversidade']:.2f} | "
                       f"Custo: R$ {melhor.metricas['custo']:.2f}")
             
             # Nova geração
@@ -659,8 +637,9 @@ class AlgoritmoGenetico:
                 if random.random() < 0.8:
                     filho1, filho2 = self.crossover(pai1, pai2)
                 else:
-                    filho1 = CardapioCompleto({k: v.copy() for k, v in pai1.refeicoes.items()})
-                    filho2 = CardapioCompleto({k: v.copy() for k, v in pai2.refeicoes.items()})
+                    # Deep copy para evitar referências compartilhadas
+                    filho1 = CardapioCompleto({k: [a.copy() for a in v] for k, v in pai1.refeicoes.items()})
+                    filho2 = CardapioCompleto({k: [a.copy() for a in v] for k, v in pai2.refeicoes.items()})
                 
                 # Mutação
                 self.mutacao(filho1, 0.2)

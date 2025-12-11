@@ -1,6 +1,6 @@
 """
 Regras Culinárias - Contexto do Mundo Real para Composição de Refeições
-VERSÃO 2.0 - Compatibilidade entre alimentos e validações rigorosas
+Compatibilidade entre alimentos e validações rigorosas
 
 Inclui:
 - Categorias culinárias detalhadas
@@ -10,7 +10,7 @@ Inclui:
 """
 
 import unicodedata
-from typing import List, Set, Tuple
+from typing import List, Tuple, Dict
 
 
 def normalizar_texto(texto: str) -> str:
@@ -49,6 +49,10 @@ PROTEINAS_OVOS = {
     'Ovo', 'Ovo Mexido'
 }
 
+PROTEINAS_EMBUTIDOS = {
+    'Mortadela', 'Presunto', 'Peito de Peru', 'Salsicha'
+}
+
 # Classificação de acompanhamentos
 ACOMPANHAMENTOS_ARROZ = {'Arroz Branco', 'Arroz Integral'}
 ACOMPANHAMENTOS_MASSA = {'Macarrão', 'Macarrão Instantâneo'}
@@ -63,60 +67,59 @@ ACOMPANHAMENTOS_LEGUMINOSAS = {'Feijão Preto', 'Feijão Carioca', 'Lentilha', '
 
 # Formato: proteína -> set de acompanhamentos PERMITIDOS
 COMPATIBILIDADE_PROTEINA_ACOMPANHAMENTO = {
-    # CARNE VERMELHA: come com TUDO
+    # CARNE VERMELHA
     'carne_vermelha': {
         'arroz': True,
         'massa': True,
         'pao': True,
         'batata': True,
         'tuberculos': True,
-        'leguminosas': True,  # Feijão combina com carne
+        'leguminosas': True, 
     },
     
-    # FRANGO: come com TUDO também
+    # FRANGO
     'frango': {
         'arroz': True,
         'massa': True,
         'pao': True,
         'batata': True,
         'tuberculos': True,
-        'leguminosas': True,  # Frango com feijão é clássico
+        'leguminosas': True,  
     },
     
-    # PEIXE: NÃO come com feijão/leguminosas nem com mandioca/inhame
+    # PEIXE
     'peixe': {
         'arroz': True,
-        'massa': False,  # Peixe com macarrão é estranho (exceto frutos do mar)
-        'pao': True,      # Sanduíche de peixe, fish & chips
-        'batata': True,   # Fish & chips clássico
-        'tuberculos': False,  # Peixe com mandioca/inhame = estranho
-        'leguminosas': False,  # Peixe com feijão = NÃO!
+        'massa': True,      
+        'pao': True,        
+        'batata': True,     
+        'tuberculos': False,  
+        'leguminosas': False,  
     },
     
-    # OVOS: versátil, mas não come com leguminosas em refeição principal
+    # OVOS
     'ovos': {
         'arroz': True,
         'massa': True,
         'pao': True,
         'batata': True,
         'tuberculos': True,
-        'leguminosas': False,  # Ovo com feijão como prato principal = estranho
+        'leguminosas': True,  
+    },
+    
+    # EMBUTIDOS
+    'embutidos': {
+        'arroz': True,
+        'massa': True,
+        'pao': True,
+        'batata': True,
+        'tuberculos': True,
+        'leguminosas': True,
     },
 }
 
-# Regras específicas para LEGUMINOSAS
-# Feijão/Lentilha: come APENAS com arroz ou massa (sopa)
-LEGUMINOSAS_ACOMPANHAMENTOS_PERMITIDOS = {
-    'arroz': True,   # Arroz com feijão = clássico brasileiro
-    'massa': True,   # Sopa de feijão com macarrão
-}
-
-# Alimentos que NÃO COMBINAM com leguminosas
-LEGUMINOSAS_PROTEINAS_PROIBIDAS = PROTEINAS_PEIXE  # Peixe não combina com feijão
-
-
 def obter_tipo_proteina(nome_alimento: str) -> str | None:
-    """Retorna o tipo de proteína (carne_vermelha, frango, peixe, ovos) ou None."""
+    """Retorna o tipo de proteína (carne_vermelha, frango, peixe, ovos, embutidos) ou None."""
     if nome_alimento in PROTEINAS_CARNE_VERMELHA:
         return 'carne_vermelha'
     elif nome_alimento in PROTEINAS_FRANGO:
@@ -125,6 +128,8 @@ def obter_tipo_proteina(nome_alimento: str) -> str | None:
         return 'peixe'
     elif nome_alimento in PROTEINAS_OVOS:
         return 'ovos'
+    elif nome_alimento in PROTEINAS_EMBUTIDOS:
+        return 'embutidos'
     return None
 
 
@@ -207,6 +212,54 @@ def verificar_compatibilidade_leguminosa(
     return len(problemas) == 0, problemas
 
 
+def validar_diversidade_cardapio(cardapio_completo: Dict[str, List[dict]]) -> Tuple[float, List[str]]:
+    """
+    Valida a diversidade de alimentos no cardápio do dia inteiro.
+    Penaliza alimentos que aparecem mais de uma vez em diferentes refeições.
+    
+    Args:
+        cardapio_completo: Dict com {nome_refeicao: [{'nome': str, 'gramas': float}, ...]}
+    
+    Returns:
+        Tuple[float, List[str]]: (score de 0 a 1, lista de problemas)
+    """
+    from collections import Counter
+    
+    problemas = []
+    penalidade_total = 0.0
+    
+    # Coleta todos os alimentos do dia
+    todos_alimentos = []
+    for nome_refeicao, alimentos in cardapio_completo.items():
+        for alimento in alimentos:
+            todos_alimentos.append((alimento['nome'], nome_refeicao))
+    
+    # Conta quantas vezes cada alimento aparece
+    contador = Counter([alimento[0] for alimento in todos_alimentos])
+    
+    # Penaliza repetições
+    for alimento, quantidade in contador.items():
+        if quantidade > 1:
+            # Encontra em quais refeições aparece
+            refeicoes_com_alimento = [ref for nome, ref in todos_alimentos if nome == alimento]
+            
+            problemas.append(
+                f"REPETIÇÃO: {alimento} aparece {quantidade}x no dia ({', '.join(set(refeicoes_com_alimento))})"
+            )
+            
+            # Penalidade progressiva: quanto mais repete, pior
+            # 2x = -0.3, 3x = -0.5, 4x+ = -0.8
+            if quantidade == 2:
+                penalidade_total += 0.3
+            elif quantidade == 3:
+                penalidade_total += 0.5
+            else:
+                penalidade_total += 0.8
+    
+    score = max(0.0, 1.0 - penalidade_total)
+    return score, problemas
+
+
 def validar_compatibilidade_refeicao(alimentos: List[dict]) -> Tuple[float, List[str]]:
     """
     Valida a compatibilidade entre todos os alimentos de uma refeição.
@@ -244,14 +297,36 @@ def validar_compatibilidade_refeicao(alimentos: List[dict]) -> Tuple[float, List
                 problemas.append(f"INCOMPATÍVEL: {p}")
                 penalidade_total += 0.5  # Penalidade muito pesada
     
-    # 3. Verifica múltiplas proteínas conflitantes (peixe + carne = estranho)
+    # 3. Verifica múltiplas proteínas conflitantes
     tem_peixe = any(p in PROTEINAS_PEIXE for p in proteinas_na_refeicao)
-    tem_carne = any(p in PROTEINAS_CARNE_VERMELHA for p in proteinas_na_refeicao)
-    tem_frango = any(p in PROTEINAS_FRANGO for p in proteinas_na_refeicao)
     
-    if tem_peixe and (tem_carne or tem_frango):
-        problemas.append("INCOMPATÍVEL: Peixe não deve ser misturado com outras carnes")
-        penalidade_total += 0.3
+    # Peixe não combina com outras carnes
+    if tem_peixe:
+        outras_carnes = [p for p in proteinas_na_refeicao 
+                        if p in PROTEINAS_CARNE_VERMELHA or p in PROTEINAS_FRANGO]
+        if outras_carnes:
+            problemas.append("INCOMPATÍVEL: Peixe não deve ser misturado com outras carnes")
+            penalidade_total += 0.3
+    
+    # Múltiplas proteínas principais na mesma refeição (exceto embutidos que são complementos)
+    proteinas_principais = [p for p in proteinas_na_refeicao if p not in PROTEINAS_EMBUTIDOS]
+    if len(proteinas_principais) > 1:
+        # Só penaliza se forem tipos diferentes
+        tipos_proteinas = set(obter_tipo_proteina(p) for p in proteinas_principais)
+        if len(tipos_proteinas) > 1:
+            problemas.append(f"INCOMPATÍVEL: Múltiplas proteínas principais na mesma refeição ({', '.join(proteinas_principais)})")
+            penalidade_total += 0.4
+    
+    # 4. Múltiplos acompanhamentos base (arroz + macarrão = ESTRANHO)
+    acompanhamentos_base = [a['nome'] for a in alimentos if a['nome'] in ACOMPANHAMENTOS_ARROZ or a['nome'] in ACOMPANHAMENTOS_MASSA]
+    if len(acompanhamentos_base) > 1:
+        problemas.append(f"INCOMPATÍVEL: Múltiplos acompanhamentos base na mesma refeição ({', '.join(acompanhamentos_base)})")
+        penalidade_total += 0.5  # Penalidade pesada - isso é muito estranho!
+    
+    # 5. Múltiplas leguminosas (feijão + lentilha = ESTRANHO)
+    if len(leguminosas_na_refeicao) > 1:
+        problemas.append(f"INCOMPATÍVEL: Múltiplas leguminosas na mesma refeição ({', '.join(leguminosas_na_refeicao)})")
+        penalidade_total += 0.5  # Penalidade pesada - brasileiro não mistura feijões!
     
     score = max(0.0, 1.0 - penalidade_total)
     return score, problemas
@@ -302,17 +377,17 @@ CATEGORIAS_CULINARIAS = {
     'Arroz Integral': 'acompanhamento_base',
     'Macarrão': 'acompanhamento_base',
     'Macarrão Instantâneo': 'refeicao_rapida',
-    'Aveia': 'cafe_da_manha_liquido',  # PRECISA de leite/iogurte!
+    'Aveia': 'cafe_da_manha_liquido', 
     'Mingau de Aveia': 'mingau',
-    'Farinha de Mandioca': 'ingrediente',  # NUNCA ISOLADO
-    'Farinha de Trigo': 'ingrediente',  # NUNCA ISOLADO
+    'Farinha de Mandioca': 'ingrediente',  
+    'Farinha de Trigo': 'ingrediente',  
     'Cuscuz de Milho': 'cafe_da_manha',
     'Pão Francês': 'cafe_da_manha',
     'Pão Integral': 'cafe_da_manha',
     'Tapioca': 'cafe_da_manha',
     'Pão de Forma': 'cafe_da_manha',
     'Pão de Centeio': 'cafe_da_manha',
-    'Granola': 'cafe_da_manha_liquido',  # PRECISA de leite/iogurte!
+    'Granola': 'cafe_da_manha_liquido', 
     
     # LEGUMINOSAS
     'Feijão Preto': 'leguminosa',
@@ -344,7 +419,6 @@ CATEGORIAS_CULINARIAS = {
     
     # FRUTAS
     'Banana Prata': 'fruta',
-    'Banana Nanica': 'fruta',
     'Maçã': 'fruta',
     'Pera': 'fruta',
     'Melancia': 'fruta',
@@ -371,8 +445,6 @@ CATEGORIAS_CULINARIAS = {
     
     # INDUSTRIALIZADOS
     'Pão de Queijo': 'lanche_leve',
-    'Coxinha': 'lanche_leve',
-    'Pastel de Carne': 'lanche_leve',
     'Mortadela': 'frios',
     'Presunto': 'frios',
     'Peito de Peru': 'frios',
@@ -406,7 +478,7 @@ REGRAS_COMPOSICAO = {
             'tuberculo',
             'prato_principal',
             'refeicao_pronta',
-            'ingrediente',  # CRÍTICO: Farinha nunca sozinha
+            'ingrediente',  
             'guarnição',
             'salada',
             'refeicao_rapida',
@@ -418,9 +490,7 @@ REGRAS_COMPOSICAO = {
             'max_itens': 4,
         },
         'combinacoes_obrigatorias': {
-            # Se tem aveia/granola, DEVE ter leite ou iogurte
             'cafe_da_manha_liquido': ['bebida', 'iogurte'],
-            # Se tem pão, DEVE ter algo para passar/rechear
             'cafe_da_manha': ['frios', 'tempero', 'proteina_cafe'],
         }
     },
@@ -444,7 +514,7 @@ REGRAS_COMPOSICAO = {
             'refeicao_pronta',
             'proteina_cafe',
             'ingrediente',
-            'cafe_da_manha_liquido',  # Aveia precisa de preparo completo
+            'cafe_da_manha_liquido',
         ],
         'estrutura': {
             'obrigatorio_um_de': ['fruta', 'iogurte', 'oleaginosa', 'lanche_leve', 'cafe_da_manha', 'mingau'],
@@ -812,10 +882,9 @@ def validar_composicao_refeicao(alimentos: list, nome_refeicao: str) -> dict:
     score = 1.0
     
     categorias_presentes = [obter_categoria_culinaria(a['nome']) for a in alimentos]
-    nomes_presentes = [a['nome'] for a in alimentos]
     
     # =========================================================================
-    # NOVA VALIDAÇÃO: Compatibilidade entre alimentos (peixe/feijão, etc.)
+    # Compatibilidade entre alimentos (peixe/feijão, etc.)
     # =========================================================================
     score_compat, problemas_compat = validar_compatibilidade_refeicao(alimentos)
     if problemas_compat:

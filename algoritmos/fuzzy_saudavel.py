@@ -1,8 +1,34 @@
+"""Sistema Fuzzy para Avaliação de Salubridade de Alimentos"""
+
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
+import pandas as pd
+import unicodedata
 
-def aplicar_logica_fuzzy(df_alimentos):
+
+# ============================================================================
+# CONSTANTES GLOBAIS
+# ============================================================================
+
+# Alimentos ultraprocessados/industrializados que recebem penalidade
+ALIMENTOS_ULTRAPROCESSADOS = {
+    'mortadela', 'presunto', 'salsicha', 'nuggets', 'nugget',
+    'pao de queijo', 'coxinha', 'pastel', 'batata frita',
+    'macarrao instantaneo', 'miojo'
+}
+
+
+def normalizar_nome(nome: str) -> str:
+    """Remove acentos e converte para minúsculas."""
+    nome_sem_acento = ''.join(
+        c for c in unicodedata.normalize('NFD', nome)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return nome_sem_acento.lower().strip()
+
+
+def aplicar_logica_fuzzy(df_alimentos: pd.DataFrame) -> pd.DataFrame:
     # --- Configuração das Variáveis Fuzzy (Antecedentes e Consequente) ---
 
     # --- ANTECEDENTES (Entradas) ---
@@ -78,15 +104,17 @@ def aplicar_logica_fuzzy(df_alimentos):
     simulador = ctrl.ControlSystemSimulation(sistema_saudavel)
 
 
-    # --- FUNÇÃO PRINCIPAL ---
-    def calcular_fuzzy(row):
-        # --- 1. INPUTS ---
+    # --- FUNÇÃO PRINCIPAL DE CÁLCULO ---
+    def calcular_fuzzy(row: pd.Series) -> float:
+        """Calcula o score de salubridade usando lógica fuzzy e regras heurísticas."""
+        
+        # --- 1. INPUTS FUZZY ---
         simulador.input['proteina']    = row['proteinas']
         simulador.input['carboidrato'] = row['carboidratos']
         simulador.input['fibra']       = row['fibras']
         simulador.input['sodio']       = row['sodio']
 
-        # Lógica de Gordura Saturada em Refeições
+        # Atenua gordura saturada em refeições caseiras com baixo sódio
         if row['tipo'] == 'refeicao' and row['sodio'] < 400:
             simulador.input['gord_sat'] = row['gordura_saturada'] * 0.6
         else:
@@ -94,77 +122,82 @@ def aplicar_logica_fuzzy(df_alimentos):
 
         simulador.input['gord_insat']  = row['gorduras_insaturadas']
 
-        # --- 2. CÁLCULO BASE ---
+        # --- 2. CÁLCULO BASE FUZZY ---
         try:
             simulador.compute()
             score = simulador.output['saudavel']
         except (ValueError, KeyError):
-            score = 5.0
+            score = 5.0  # Valor neutro em caso de erro
 
-        # --- 3. PÓS-PROCESSAMENTO ---
-
-        # A) Penalidade Industrializados
-        if row['tipo'] == 'industrializado':
-            score -= 2.5
-
-        # B) Lógica de Refeições
-        elif row['tipo'] == 'refeicao':
+        # --- 3. AJUSTES HEUÍSTICOS (aplicados em ordem de prioridade) ---
+        
+        nome_normalizado = normalizar_nome(row['nome'])
+        tipo_alimento = row['tipo']
+        
+        # A) PENALIDADE ULTRAPROCESSADOS (maior prioridade)
+        # Verifica se é exatamente um nome ultraprocessado (não substring)
+        eh_ultraprocessado = nome_normalizado in ALIMENTOS_ULTRAPROCESSADOS
+        if eh_ultraprocessado:
+            score -= 2.0  # Penalidade pesada mas não exagerada
+        
+        # B) BÔNUS REFEIÇÕES CASEIRAS
+        elif tipo_alimento == 'refeicao':
+            # Refeições caseiras ganham bônus base
             bonus = 1.5
-            # Frango à Milanesa perde o bônus aqui (sodio >= 500 ou gordura >= 10)
+            
+            # Perde bônus se for frita/muito gordurosa
             if row['sodio'] >= 500 or row['gorduras'] >= 10:
                 bonus = 0.0
-                score -= 1.0 # Penalidade leve por ser fritura
-
+                score -= 1.0  # Penalidade por fritura
+            
             score += bonus
-            if row['proteinas'] > 15 and bonus > 0: score += 0.5
-
-        # C) Bônus Vegetais/Frutas
-        elif row['tipo'] in ['vegetal', 'fruta']:
-            score += 1.5 + (row['fibras'] * 0.25)
-
-        # D) Energia Limpa
-        # Se é carboidrato/tubérculo, tem BAIXA gordura (<2g) e BAIXO sódio (<150mg),
-        # ele é uma fonte de energia limpa e saudável.
-        elif row['tipo'] in ['carboidrato', 'tuberculo']:
-            if row['gorduras'] < 2.5 and row['sodio'] < 150:
-                score += 1.5 # Arroz Branco sobe de 5.0 para 6.5 (Nota Azul!)
-
-            # E se ainda por cima tiver fibra (Integral/Aveia), ganha mais um pouco
-            if row['fibras'] > 2.5:
+            
+            # Bônus extra para refeições proteicas saudáveis
+            if row['proteinas'] > 15 and bonus > 0:
                 score += 0.5
+        
+        # C) BÔNUS VEGETAIS/FRUTAS
+        elif tipo_alimento in ['vegetal', 'fruta']:
+            # Vegetais e frutas são sempre bem-vindos
+            score += 1.5 + (row['fibras'] * 0.25)
+        
+        # D) BÔNUS ENERGIA LIMPA (carboidratos naturais)
+        elif tipo_alimento in ['carboidrato', 'tuberculo']:
+            # Fonte de energia limpa: baixa gordura E baixo sódio
+            if row['gorduras'] < 2.5 and row['sodio'] < 150:
+                score += 1.5  # Arroz branco, batata, mandioca
+                
+                # Bônus adicional para integrais (alto teor de fibra)
+                if row['fibras'] > 2.5:
+                    score += 0.5
 
-        # --- 4. TRAVAS DE SEGURANÇA ---
+        # --- 4. TRAVAS DE SEGURANÇA (aplicadas após todos os bônus) ---
+        
+        # Trava de Sódio (limite máximo progressivo)
+        if row['sodio'] > 800:
+            score = min(score, 4.0)  # Máximo 4.0 para sódio muito alto
+        elif row['sodio'] > 600:
+            score = min(score, 5.5)  # Máximo 5.5 para sódio alto
 
-        # Trava de Sódio
-        if row['sodio'] > 800: score = min(score, 4.0)
-        elif row['sodio'] > 600: score = min(score, 5.0)
+        # Trava de Gordura Saturada em Proteínas
+        if tipo_alimento == 'proteina' and row['gordura_saturada'] > 6:
+            score -= 2.0  # Carne muito gorda
 
-        # Trava de Gordura Saturada em Carnes
-        if row['tipo'] == 'proteina' and row['gordura_saturada'] > 6:
-            score -= 2.0
+        # Trava de Carboidrato Refinado (farinha branca, açúcar)
+        if (row['carboidratos'] > 75 and row['fibras'] < 1 and 
+            tipo_alimento == 'carboidrato'):
+            score = min(score, 5.0)  # Carboidrato vazio
 
-        # Trava de Farinha/Açúcar (Carbo alto, fibra quase zero e não é tubérculo natural)
-        # Exceção para tapioca/mandioca que são naturais
-        if row['carboidratos'] > 75 and row['fibras'] < 1 and row['tipo'] == 'carboidrato':
-            score = min(score, 5.0)
-
-        # Trava de Gordura Pura
-        if row['gorduras'] > 80 and score > 8.5:
-            score = 7.5
-
-        return max(0, min(10, score))
+        # Trava de Gordura Pura (óleos, manteiga em excesso)
+        if row['gorduras'] > 80:
+            score = min(score, 7.5)  # Mesmo sendo gordura boa, não pode ser 10
+        
+        # --- 5. GARANTIR LIMITES [0, 10] ---
+        return max(0.0, min(10.0, score))
 
     # --- Aplicando a Função Fuzzy ao DataFrame ---
-    df_alimentos['nota_saudavel_fuzzy'] = df_alimentos.apply(calcular_fuzzy, axis=1).round(2)
-
-    # --- Arredondar a nota final para 2 casas decimais ---
-    df_alimentos['nota_saudavel_fuzzy'] = df_alimentos['nota_saudavel_fuzzy'].round(2)
-
-    # --- Exibindo os Top 15 Mais Saudáveis e Top 15 Menos Saudáveis ---
-    ## print("=== TOP 15 ALIMENTOS MAIS SAUDÁVEIS (FUZY) ===")
-    ## print(df_alimentos.sort_values(by='nota_saudavel_fuzzy', ascending=False)[['nome', 'tipo', 'nota_saudavel_fuzzy']].head(15))
-
-    ## print("\n=== TOP 15 ALIMENTOS MENOS SAUDÁVEIS ===")
-    ## print(df_alimentos.sort_values(by='nota_saudavel_fuzzy', ascending=True)[['nome', 'tipo', 'nota_saudavel_fuzzy']].head(15))
+    df_alimentos['nota_saudavel_fuzzy'] = (
+        df_alimentos.apply(calcular_fuzzy, axis=1).round(2)
+    )
 
     return df_alimentos
