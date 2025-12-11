@@ -1,6 +1,6 @@
 """
 Algoritmo Genético - Refeições Compostas com Controle de Macros e Regras Culinárias do Mundo Real
-VERSÃO CORRIGIDA - Bugs críticos resolvidos
+VERSÃO 2.0 - Sistema de compatibilidade entre alimentos
 """
 
 import numpy as np 
@@ -13,6 +13,12 @@ from data.regras_culinarias import (
     obter_limites_gramatura,
     alimento_permitido_na_refeicao,
     validar_composicao_refeicao,
+    validar_compatibilidade_refeicao,
+    verificar_compatibilidade_proteina_acompanhamento,
+    obter_tipo_proteina,
+    obter_tipo_acompanhamento,
+    PROTEINAS_PEIXE,
+    ACOMPANHAMENTOS_LEGUMINOSAS,
     GRAMATURA_REALISTA
 )
 
@@ -125,7 +131,7 @@ class AlgoritmoGenetico:
     def _gerar_refeicao_aleatoria(self, calorias_alvo: float, nome_ref: str) -> List[Dict]:
         """
         Gera uma refeição aleatória seguindo REGRAS CULINÁRIAS DO MUNDO REAL.
-        VERSÃO CORRIGIDA - Força combinações obrigatórias.
+        VERSÃO 2.0 - Valida compatibilidade entre proteínas e acompanhamentos.
         """
         alimentos_ref = []
         calorias_atual = 0
@@ -172,26 +178,47 @@ class AlgoritmoGenetico:
         # Distribui calorias de forma inteligente
         calorias_por_componente = calorias_alvo / total_componentes
         
+        # =====================================================================
+        # NOVO: Primeiro escolhe a proteína (se houver), depois filtra acompanhamentos
+        # =====================================================================
+        proteina_escolhida = None
+        
         # Adiciona componentes OBRIGATÓRIOS
         categorias_adicionadas = []
         for categoria in categorias_obrigatorias:
-            alimento = self._escolher_alimento_por_categoria(
-                categoria, 
-                calorias_por_componente, 
-                nome_ref
-            )
-            if alimento:
-                alimentos_ref.append(alimento)
-                calorias_atual += alimento['calorias']
-                categorias_adicionadas.append(categoria)
+            # Se for prato_principal, guarda para verificar compatibilidade depois
+            if categoria == 'prato_principal':
+                alimento = self._escolher_alimento_por_categoria(
+                    categoria, 
+                    calorias_por_componente, 
+                    nome_ref
+                )
+                if alimento:
+                    alimentos_ref.append(alimento)
+                    calorias_atual += alimento['calorias']
+                    categorias_adicionadas.append(categoria)
+                    proteina_escolhida = alimento['nome']
+            else:
+                # Para outras categorias, verifica compatibilidade com proteína
+                alimento = self._escolher_alimento_por_categoria_compativel(
+                    categoria, 
+                    calorias_por_componente, 
+                    nome_ref,
+                    proteina_escolhida
+                )
+                if alimento:
+                    alimentos_ref.append(alimento)
+                    calorias_atual += alimento['calorias']
+                    categorias_adicionadas.append(categoria)
         
-        # Adiciona componentes OPCIONAIS
+        # Adiciona componentes OPCIONAIS (com verificação de compatibilidade)
         categorias_op_escolhidas = random.sample(categorias_opcionais, min(num_opcionais, len(categorias_opcionais)))
         for categoria in categorias_op_escolhidas:
-            alimento = self._escolher_alimento_por_categoria(
+            alimento = self._escolher_alimento_por_categoria_compativel(
                 categoria,
                 calorias_por_componente,
-                nome_ref
+                nome_ref,
+                proteina_escolhida
             )
             if alimento:
                 alimentos_ref.append(alimento)
@@ -208,10 +235,11 @@ class AlgoritmoGenetico:
                 if not tem_necessaria:
                     # FORÇA adicionar uma categoria necessária
                     categoria_faltante = random.choice(categorias_necessarias)
-                    alimento_faltante = self._escolher_alimento_por_categoria(
+                    alimento_faltante = self._escolher_alimento_por_categoria_compativel(
                         categoria_faltante,
                         calorias_por_componente * 0.5,  # Metade das calorias
-                        nome_ref
+                        nome_ref,
+                        proteina_escolhida
                     )
                     if alimento_faltante:
                         alimentos_ref.append(alimento_faltante)
@@ -244,6 +272,67 @@ class AlgoritmoGenetico:
                 alimentos_ref[i] = self._escalar_alimento(alimento_base, nova_gramas, calorias_alvo)
         
         return alimentos_ref
+    
+    def _escolher_alimento_por_categoria_compativel(self, categoria_culinaria: str, 
+                                                     calorias_alvo: float, 
+                                                     nome_ref: str,
+                                                     proteina_escolhida: str | None = None) -> Dict | None:
+        """
+        Escolhe um alimento compatível com a proteína já escolhida.
+        NOVO: Filtra acompanhamentos incompatíveis (ex: feijão com peixe).
+        """
+        # Filtra alimentos por categoria culinária
+        candidatos = []
+        
+        for tipo_nutri, indices in self.alimentos_pre.items():
+            for idx in indices:
+                alimento_nome = str(self.df.loc[idx, 'nome'])
+                cat_culinaria = obter_categoria_culinaria(alimento_nome)
+                
+                if cat_culinaria == categoria_culinaria:
+                    # Verifica se é permitido nesta refeição
+                    if alimento_permitido_na_refeicao(alimento_nome, nome_ref):
+                        # NOVO: Verifica compatibilidade com proteína escolhida
+                        if proteina_escolhida:
+                            compativel, _ = verificar_compatibilidade_proteina_acompanhamento(
+                                proteina_escolhida, alimento_nome
+                            )
+                            if not compativel:
+                                continue  # Pula alimentos incompatíveis
+                        
+                        candidatos.append(idx)
+        
+        if not candidatos:
+            # Fallback: usa função original sem filtro de compatibilidade
+            return self._escolher_alimento_por_categoria(categoria_culinaria, calorias_alvo, nome_ref)
+        
+        # Escolhe aleatoriamente
+        idx_escolhido = random.choice(candidatos)
+        alimento_base = self.df.loc[idx_escolhido]
+        
+        # Calcula gramatura baseada nas calorias-alvo e limites culinários
+        limites = obter_limites_gramatura(str(alimento_base['nome']))
+        
+        try:
+            calorias_value = float(alimento_base['calorias'])
+        except (ValueError, TypeError):
+            calorias_value = 100.0
+        
+        if calorias_value > 0:
+            gramas_ideal = (calorias_alvo * 100) / calorias_value
+            
+            # Ajusta para limites culinários realistas
+            num_total_refeicoes = len(self.config_refeicoes)
+            if num_total_refeicoes <= 4:
+                limites_max_ajustado = int(limites['max'] * 1.5)
+            else:
+                limites_max_ajustado = limites['max']
+            
+            gramas = max(limites['min'], min(limites_max_ajustado, gramas_ideal))
+        else:
+            gramas = limites['ideal']
+        
+        return self._escalar_alimento(alimento_base, gramas, calorias_alvo)
     
     def _escolher_alimento_por_categoria(self, categoria_culinaria: str, 
                                          calorias_alvo: float, 
