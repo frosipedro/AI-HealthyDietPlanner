@@ -324,14 +324,8 @@ Desenvolvido como **Trabalho Final** da disciplina de Inteligência Artificial.
 
 **Orientador**: Prof. Marcos Sulzbach Morgenstern
 
-**Instituição**: Universidade do Vale do Rio dos Sinos (Unisinos)
+**Instituição**: Universidade Regional do Noroeste do Estado do Rio Grande do Sul (UNIJUÍ)
 
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-<div align="center">
-
-**[⬆ Voltar ao topo](#-ai-healthydietplanner)**
-
-</div>
