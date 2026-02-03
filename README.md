@@ -2,13 +2,6 @@
 
 ### Sistema Inteligente de Recomendação de Cardápios Personalizados
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Fuzzy Logic](https://img.shields.io/badge/AI-Fuzzy%20Logic-orange.svg)]()
-[![Neural Network](https://img.shields.io/badge/AI-Neural%20Network-purple.svg)]()
-[![Genetic Algorithm](https://img.shields.io/badge/AI-Genetic%20Algorithm-red.svg)]()
-[![A* Search](https://img.shields.io/badge/AI-A*%20Search-yellow.svg)]()
-
 ## 📖 Sobre o Projeto
 
 O **AI-HealthyDietPlanner** é um sistema avançado de geração automática de cardápios alimentares que combina **4 técnicas de Inteligência Artificial** para criar planos nutricionais personalizados, saudáveis e realistas, respeitando a culinária brasileira.
@@ -329,3 +322,4 @@ Desenvolvido como **Trabalho Final** da disciplina de Inteligência Artificial.
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
